@@ -1,0 +1,2 @@
+source "package/amlogic/aml-wifibt/aml-wifi/Config.in"
+source "package/amlogic/aml-wifibt/aml-bt/Config.in"

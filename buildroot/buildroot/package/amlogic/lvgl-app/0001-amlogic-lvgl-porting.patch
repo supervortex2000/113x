@@ -1,0 +1,44 @@
+diff --git a/lvgl/lv_conf_template.h b/lvgl/lv_conf_template.h
+index 8bdddb4..7961ec4 100644
+--- a/lvgl/lv_conf_template.h
++++ b/lvgl/lv_conf_template.h
+@@ -46,7 +46,7 @@
+  *=========================*/
+ 
+ /*1: use custom malloc/free, 0: use the built-in `lv_mem_alloc()` and `lv_mem_free()`*/
+-#define LV_MEM_CUSTOM 0
++#define LV_MEM_CUSTOM 1
+ #if LV_MEM_CUSTOM == 0
+ /*Size of the memory available for `lv_mem_alloc()` in bytes (>= 2kB)*/
+ #  define LV_MEM_SIZE (32U * 1024U)          /*[bytes]*/
+@@ -513,7 +513,7 @@ e.g. "stm32f769xx.h" or "stm32f429xx.h"*/
+ #if LV_USE_THEME_DEFAULT
+ 
+ /*0: Light mode; 1: Dark mode*/
+-# define LV_THEME_DEFAULT_DARK 0
++# define LV_THEME_DEFAULT_DARK 1
+ 
+ /*1: Enable grow on press*/
+ # define LV_THEME_DEFAULT_GROW 1
+@@ -563,7 +563,7 @@ e.g. "stm32f769xx.h" or "stm32f429xx.h"*/
+ 
+ /* JPG + split JPG decoder library.
+  * Split JPG is a custom format optimized for embedded systems. */
+-#define LV_USE_SJPG 0
++#define LV_USE_SJPG 1
+ 
+ /*GIF decoder library*/
+ #define LV_USE_GIF 0
+diff --git a/lvgl/src/lv_conf_internal.h b/lvgl/src/lv_conf_internal.h
+index b3e6748..cbacf82 100644
+--- a/lvgl/src/lv_conf_internal.h
++++ b/lvgl/src/lv_conf_internal.h
+@@ -38,7 +38,7 @@
+ #  elif defined(LV_CONF_INCLUDE_SIMPLE)        /*Or simply include lv_conf.h is enabled*/
+ #    include "lv_conf.h"
+ #  else
+-#    include "../../lv_conf.h"                 /*Else assume lv_conf.h is next to the lvgl folder*/
++#    include "../lv_conf.h"                 /*Else assume lv_conf.h is next to the lvgl folder*/
+ #  endif
+ #endif
+ 

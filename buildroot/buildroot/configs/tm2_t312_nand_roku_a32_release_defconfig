@@ -1,0 +1,19 @@
+#----------------------------------------------------------#
+#include "arch_a32_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "tm2_t312_roku.config"
+
+BR2_TARGET_ROOTFS_EXT2=n
+BR2_TARGET_ROOTFS_EXT2_4=n
+#include "flash_nand_4k.config"
+
+#----------------------------------------------------------#
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesontm2_t312/initramfs/ramfslist-32-ubi-roku-release"
+BR2_ROOTFS_UPGRADE_DIR="board/amlogic/common/upgrade/upgrade-tm2-tv-nand/"
+
+BR2_PACKAGE_RTK8821CU=y
+BR2_PACKAGE_RTK8821CU_LOCAL=y
+BR2_PACKAGE_RTK8821CU_STANDALONE=y
+BR2_PACKAGE_RTK8821CU_GIT_VERSION="buildroot"
+BR2_PACKAGE_RTK8821CU_LOCAL_PATH="$(TOPDIR)/../hardware/aml-4.9/wifi/realtek/drivers/8821cu"

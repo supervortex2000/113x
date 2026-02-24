@@ -1,0 +1,27 @@
+diff --git a/DIALServer/DIALServer.config b/DIALServer/DIALServer.config
+index c9576f4..9506931 100644
+--- a/DIALServer/DIALServer.config
++++ b/DIALServer/DIALServer.config
+@@ -63,6 +63,22 @@ if("${PLUGIN_DIALSERVER_ENABLE_YOUTUBE}")
+         message(SEND_ERROR "Unknown YouTube mode:<${PLUGIN_DIALSERVER_YOUTUBE_MODE}>")
+     endif()
+ endif()
++if("${PLUGIN_DIALSERVER_ENABLE_YOUTUBE}")
++    if("${PLUGIN_DIALSERVER_YOUTUBE_MODE}" STREQUAL "active")
++        add_app(  ${configuration}
++            NAME YouTubeKids
++            CALLSIGN YTKids
++            RUNTIME  true
++            HIDE true
++            URL "https://www.youtube.com/tv_kids")
++    elseif("${PLUGIN_DIALSERVER_YOUTUBE_MODE}" STREQUAL "passive")
++        add_app(  ${configuration}
++            NAME YouTubeKids
++            URL "https://www.youtube.com/tv_kids")
++    else()
++        message(SEND_ERROR "Unknown YouTube mode:<${PLUGIN_DIALSERVER_YOUTUBE_MODE}>")
++    endif()
++endif()
+ 
+ if("${PLUGIN_DIALSERVER_ENABLE_NETFLIX}")
+     if("${PLUGIN_DIALSERVER_NETFLIX_MODE}" STREQUAL "active")

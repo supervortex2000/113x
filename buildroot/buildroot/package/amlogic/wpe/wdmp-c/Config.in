@@ -1,0 +1,6 @@
+menuconfig BR2_PACKAGE_WDMP_C
+	bool "wdmp-c"
+	select BR2_PACKAGE_CJSON
+	help
+	    wdmp-c.
+

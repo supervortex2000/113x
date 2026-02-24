@@ -1,0 +1,14 @@
+menu "mbi"
+config BR2_PACKAGE_MBI
+	bool "mbi"
+    depends on BR2_PACKAGE_MBD_DEWARP
+    depends on BR2_PACKAGE_MBD_GE2D
+    depends on BR2_PACKAGE_MBD_REGION
+    depends on BR2_PACKAGE_MBD_BASE
+    depends on BR2_PACKAGE_MBD_CVE
+    depends on BR2_PACKAGE_PMZ
+    depends on BR2_PACKAGE_MBD_CAMERA
+    depends on BR2_PACKAGE_MBD_PPU
+	help
+	  media business interface
+endmenu

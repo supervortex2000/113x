@@ -1,0 +1,5 @@
+config BR2_PACKAGE_AML_DTVDEMOD
+	bool "t2 demod firmware"
+	help
+	  t2 demod firmware
+

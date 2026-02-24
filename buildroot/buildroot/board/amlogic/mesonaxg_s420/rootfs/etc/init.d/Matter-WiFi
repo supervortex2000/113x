@@ -1,0 +1,153 @@
+#!/bin/sh
+#
+# Copyright (c) 2022 Amlogic, Inc. All rights reserved.
+# This source code is subject to the terms and conditions
+# defined in the file 'LICENSE' which is part of this source code package.
+# Description: S39 wifi file
+#
+NAME1=wpa_supplicant
+DAEMON1=/usr/sbin/$NAME1
+PIDFILE1=/var/run/$NAME1.pid
+
+NAME2=hostapd
+DAEMON2=/usr/sbin/$NAME2
+PIDFILE2=/var/run/$NAME2.pid
+
+NAME3=dnsmasq
+DAEMON3=/usr/sbin/$NAME3
+PIDFILE3=/var/run/$NAME3.pid
+
+NAME4=dhcpcd
+DAEMON4=/usr/sbin/$NAME4
+PIDFILE4=/var/run/${NAME4}-wlan0.pid
+
+RTK_FLAG_FILE=/etc/wifi/rtk_station_mode
+RTK_WIFI_FLAG="NONE"
+
+MULTI_WIFI=/usr/bin/multi_wifi_load_driver
+
+function start_sta(){
+if [ $? -eq 0 ]; then
+	cnt=1
+	while [ $cnt -lt 60 ]; do
+		status=`wpa_cli status`
+		status=${status##*wpa_state=}
+		status=$(echo $status |awk '{print $1}')
+		if [ "$status" = "COMPLETED" ];then
+			dhcpcd wlan0 &
+			break
+		else
+			cnt=$((cnt + 1))
+			sleep 1
+		fi
+	done
+
+	if [[ "${RTK_WIFI_FLAG}" == "TRUE" ]]
+	then
+		if [ ${cnt} -eq 60 ]
+		then
+			rm ${RTK_FLAG_FILE}
+			sync
+		fi
+	fi
+fi
+}
+
+function init_wifi_env()
+{
+    killall hostapd
+    killall wpa_supplicant
+    killall dnsmasq
+    killall dhcpcd
+}
+
+function wifi_setup()
+{
+    ifconfig wlan0 &> /dev/null
+    ifconfig wlan0 0.0.0.0
+
+    if [[ "$1" == "both" || "$1" == "station" ]]
+    then
+	start_sta
+    fi
+}
+
+function rtk_wifi_ap()
+{
+    wifi_setup ap
+}
+
+
+function rtk_wifi_station()
+{
+	wifi_setup station
+	if [ ! -f ${RTK_FLAG_FILE} ]
+	then
+		init_wifi_env
+		rtk_wifi_ap
+	fi
+
+}
+
+function wifi_rtk()
+{
+	if [ -f ${RTK_FLAG_FILE} ]
+	then
+		 rtk_wifi_station
+	else
+		rtk_wifi_ap
+	fi
+}
+
+function wifi_start()
+{
+
+	init_wifi_env
+
+	echo "start wifi station mode load driver and setup......"
+	$MULTI_WIFI station 1
+	mkdir -p /etc/wifi
+	mkdir -p /data/vendor/wifi
+	if [ -f /sys/bus/mmc/devices/sdio:0001/sdio:0001:1/vendor ]; then
+		wifi_chip_id_vendor="/sys/bus/mmc/devices/sdio:0001/sdio:0001:1/vendor"
+	else
+		wifi_chip_id_vendor="/sys/bus/mmc/devices/sdio:0000/sdio:0000:1/vendor"
+	fi
+
+	wifi_chip_id=`cat ${wifi_chip_id_vendor}`
+	case "${wifi_chip_id}" in
+		0x02d0|0x8888)
+			wifi_setup both
+			;;
+		#we use qca9377 same with rtk temperary
+		0x024c|0x0271)
+			RTK_WIFI_FLAG="TRUE"
+			wifi_rtk
+			;;
+	esac
+}
+
+case "$1" in
+    start)
+		wifi_start &
+        ;;
+    stop)
+        killall hostapd
+        killall wpa_supplicant
+        killall dnsmasq
+        killall dhcpcd
+	ifconfig wlan1 down
+	ifconfig wlan0 down
+	$MULTI_WIFI station 0
+        $POWERCTL 0
+        ;;
+    restart)
+        $0 stop
+        $0 start
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+esac
+
+exit $?

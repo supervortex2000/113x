@@ -1,0 +1,278 @@
+config BR2_PACKAGE_WPEFRAMEWORK
+    bool "wpeframework"
+    help
+      WPE Framework
+
+if BR2_PACKAGE_WPEFRAMEWORK
+
+menu "Options"
+
+choice BR2_PACKAGE_WPEFRAMEWORK_BUILD_TYPE
+    prompt "Build type"
+    default BR2_PACKAGE_WPEFRAMEWORK_BUILD_TYPE_RELEASE
+    help
+      Select the type of build you want to use.
+
+config BR2_PACKAGE_WPEFRAMEWORK_BUILD_TYPE_DEBUG
+    bool "Debug"
+    help
+     This build type is with: traces, callstacks, symbols, asserts; without: optimizations.
+
+config BR2_PACKAGE_WPEFRAMEWORK_BUILD_TYPE_DEBUG_OPTIMIZED
+    bool "Debug optimized"
+    help
+     This build type is with: traces, callstacks, symbols, asserts.
+
+config BR2_PACKAGE_WPEFRAMEWORK_BUILD_TYPE_RELEASE_WITH_SYMBOLS
+    bool "Release with symbols"
+    help
+      This build type is with: callstacks, symbols; without: asserts, traces.
+
+config BR2_PACKAGE_WPEFRAMEWORK_BUILD_TYPE_RELEASE
+    bool "Release"
+    help
+      This build type is with: callstacks; without: asserts, traces, symbols.
+
+config BR2_PACKAGE_WPEFRAMEWORK_BUILD_TYPE_PRODUCTION
+    bool "Production"
+    help
+      This build type is without: traces, callstacks, symbols, asserts.
+
+endchoice
+
+choice BR2_PACKAGE_WPEFRAMEWORK_MAXOSD_RESOLUTION
+    default BR2_PACKAGE_WPEFRAMEWORK_MAXOSD_RESOLUTION_1080P
+    prompt "max osd resolution"
+    help
+      Select MAX Osd Resolution
+
+config BR2_PACKAGE_WPEFRAMEWORK_MAXOSD_RESOLUTION_720P
+    bool "720p"
+    help
+      Set the osd resolution to 720p (HD Ready)
+
+config BR2_PACKAGE_WPEFRAMEWORK_MAXOSD_RESOLUTION_1080P
+    bool "1080p"
+    help
+      Set the osd resolution to 1080p (Full HD)
+
+config BR2_PACKAGE_WPEFRAMEWORK_MAXOSD_RESOLUTION_2160P
+    bool "2160p"
+    help
+      Set the osd resolution to 2160p (4k)
+
+endchoice
+
+config BR2_PACKAGE_WPEFRAMEWORK_CREATE_IPKG_TARGETS
+    bool "create ipkg targets"
+    select BR2_PACKAGE_HOST_OPKG_UTILS
+    depends on BR2_PACKAGE_WPEFRAMEWORK_PACKAGER
+    help
+        Creates from configured targets, a DEBIAN 2.0 (ipk, opk, deb) packages. Configured packages will install theirs
+        staging file, but not target files on the root filesystem
+
+config BR2_PACKAGE_WPEFRAMEWORK_PORT
+    string "port"
+    default "80"
+
+config BR2_PACKAGE_WPEFRAMEWORK_BIND
+    string "bind"
+    default "0.0.0.0"
+
+config BR2_PACKAGE_WPEFRAMEWORK_INTERFACE
+    string "interface"
+    default ""
+
+config BR2_PACKAGE_WPEFRAMEWORK_IDLE_TIME
+    string "idle-time"
+    default "180"
+
+config BR2_PACKAGE_WPEFRAMEWORK_PERSISTENT_PATH
+    string "persistent path"
+    default "/root"
+
+config BR2_PACKAGE_WPEFRAMEWORK_VOLATILE_PATH
+    string "volatile path"
+    default "/tmp"
+
+config BR2_PACKAGE_WPEFRAMEWORK_DATA_PATH
+    string "data path"
+    default "/usr/share/WPEFramework"
+
+config BR2_PACKAGE_WPEFRAMEWORK_SYSTEM_PATH
+    string "system path"
+    default "/usr/lib/wpeframework/plugins"
+
+config BR2_PACKAGE_WPEFRAMEWORK_PROXYSTUB_PATH
+    string "proxystub path"
+    default "/usr/lib/wpeframework/proxystubs"
+
+config BR2_PACKAGE_WPEFRAMEWORK_TRACE_SETTINGS
+    string "trace settings"
+    default ""
+
+config BR2_PACKAGE_WPEFRAMEWORK_OOM_ADJUST
+    string "oom-adjust"
+    default ""
+
+config BR2_PACKAGE_WPEFRAMEWORK_SYSTEM_PREFIX
+    string "system prefix"
+    default ""
+
+config BR2_PACKAGE_WPEFRAMEWORK_EXCEPTIONS_ENABLE
+    bool "exceptions on"
+    default n
+
+source "package/amlogic/wpe/wpeframework-devtools/Config.in"
+
+endmenu
+
+menu "Extensions"
+
+menuconfig BR2_PACKAGE_WPEFRAMEWORK_BROADCAST
+    bool "Broadcast"
+        default n
+    help
+      Abstraction on QAM tuner and PSI/SI parser functionality.
+
+if BR2_PACKAGE_WPEFRAMEWORK_BROADCAST
+config BR2_PACKAGE_WPEFRAMEWORK_BROADCAST_SI_PARSING
+    bool "SI Parsing"
+        default n
+    help
+      Enable functionality to automatically parse SI information on the
+          tuned streams.
+endif
+
+config BR2_PACKAGE_WPEFRAMEWORK_CDM
+    bool "CDM"
+    help
+      CDM client support compatible with OpenCDM
+
+config BR2_PACKAGE_WPEFRAMEWORK_COMPOSITORCLIENT
+    bool "CompositorClient"
+        default y
+    help
+      A graphical/input abstraction. This library is included in micro services that requires user
+          interaction (Graphics/input). The implementation hides all the compositor specific details.
+      allows for relaying keys to plugins
+
+config BR2_PACKAGE_WPEFRAMEWORK_GSTREAMERCLIENT
+        bool "GstreamerClient"
+        default n
+        help
+          Gstreamer client provides custom APIs to manipulate underneath stream sinks which will be linked with created pipeline.
+          This implementation will vary based on custom platforms and sink backends.
+
+config BR2_PACKAGE_WPEFRAMEWORK_DISPLAYINFO
+    bool "DisplayInfo"
+        default y
+    help
+        A helpful C-interface to easily get information from the DisplayInfo plugin.
+
+menuconfig BR2_PACKAGE_WPEFRAMEWORK_CRYPTOGRAPHY
+    bool "Cryptography"
+        default n
+    help
+      Abstraction on generic cryptography functionality.
+
+if BR2_PACKAGE_WPEFRAMEWORK_CRYPTOGRAPHY
+choice BR2_PACKAGE_WPEFRAMEWORK_CRYPTOGRAPHY_IMPLEMENTATION
+	prompt "Implementation"
+	default BR2_PACKAGE_WPEFRAMEWORK_CRYPTOGRAPHY_IMPLEMENTATION_OPENSSL
+	help
+	  Choose implementation
+
+config BR2_PACKAGE_WPEFRAMEWORK_CRYPTOGRAPHY_IMPLEMENTATION_THUNDER
+	bool "Thunder"
+	help
+	  Use Thunder as cryptography backend.
+
+config BR2_PACKAGE_WPEFRAMEWORK_CRYPTOGRAPHY_IMPLEMENTATION_OPENSSL
+	bool "OpenSSL"
+	depends on BR2_PACKAGE_OPENSSL
+	help
+	  Use OpenSSL as cryptography backend.
+
+config BR2_PACKAGE_WPEFRAMEWORK_CRYPTOGRAPHY_IMPLEMENTATION_NEXUS
+	bool "Nexus"
+	depends on BR2_PACKAGE_HAS_NEXUS
+	help
+	  Use Nexus as cryptography backend.
+endchoice
+endif
+
+config BR2_PACKAGE_WPEFRAMEWORK_PROCESSCONTAINERS
+    bool "Process Containers"
+        default n
+    help
+      Enable ability to start a containerized nanoservices
+
+if BR2_PACKAGE_WPEFRAMEWORK_PROCESSCONTAINERS
+
+choice BR2_PACKAGE_WPEFRAMEWORK_PROCESSCONTAINERS_BE
+    prompt "Containers backend"
+    default BR2_PACKAGE_WPEFRAMEWORK_PROCESSCONTAINERS_BE_LXC
+    help
+        Select which container framework to use as a backend
+
+config BR2_PACKAGE_WPEFRAMEWORK_PROCESSCONTAINERS_BE_LXC
+    bool "LXC"
+    select BR2_PACKAGE_LXC
+    select BR2_PACKAGE_CGROUPFS_MOUNT
+
+config BR2_PACKAGE_WPEFRAMEWORK_PROCESSCONTAINERS_BE_RUNC
+    bool "RunC"
+    select BR2_PACKAGE_RUNC
+    select BR2_PACKAGE_CGROUPFS_MOUNT
+
+config BR2_PACKAGE_WPEFRAMEWORK_PROCESSCONTAINERS_BE_CRUN
+    bool "CRun"
+    select BR2_PACKAGE_CRUN
+    select BR2_PACKAGE_CGROUPFS_MOUNT
+
+endchoice
+
+endif
+
+config BR2_PACKAGE_WPEFRAMEWORK_PROVISIONPROXY
+    bool "ProvisionProxy"
+    select BR2_PACKAGE_LIBPROVISION
+    help
+      Allows provisioning of modules from the cloud.
+
+config BR2_PACKAGE_WPEFRAMEWORK_SECURE_SOCKET
+    bool "SecureSocket"
+    select BR2_PACKAGE_OPENSSL
+    help
+      Adds a Secure Socket implementation (dependency OpenSSL)
+
+
+config BR2_PACKAGE_WPEFRAMEWORK_SECURITYAGENT_ACCESSOR
+    bool "SecurityAgent"
+    help
+      Allows external access to the Security Agent, through a C interface.
+
+config BR2_PACKAGE_WPEFRAMEWORK_VIRTUALINPUT
+    bool "VirtualInput"
+    help
+      If the dynamic uinput system can not be used for security reasons, this
+      allows for relaying keys to plugins
+
+endmenu
+
+menu "Plugins"
+source "package/amlogic/wpe/wpeframework-plugins/Config.in"
+source "package/amlogic/wpe/wpeframework-amazon/Config.in"
+source "package/amlogic/wpe/wpeframework-avs/Config.in"
+source "package/amlogic/wpe/wpeframework-avnclient/Config.in"
+source "package/amlogic/wpe/wpeframework-launcher/Config.in"
+source "package/amlogic/wpe/wpeframework-netflix/Config.in"
+source "package/amlogic/wpe/wpeframework-playgiga/Config.in"
+source "package/amlogic/wpe/wpeframework-provisioning/Config.in"
+source "package/amlogic/wpe/wpeframework-spotify/Config.in"
+source "package/amlogic/wpe/wpeframework-switchboard/Config.in"
+source "package/amlogic/wpe/wpeframework-ui/Config.in"
+endmenu
+
+endif

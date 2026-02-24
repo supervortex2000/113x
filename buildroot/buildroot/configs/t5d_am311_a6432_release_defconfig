@@ -1,0 +1,12 @@
+#----------------------------------------------------------#
+#include "arch_a6432_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "t5d_am311.config"
+BR2_LINUX_KERNEL_DEFCONFIG="meson64"
+BR2_LINUX_KERNEL_UIMAGE=n
+BR2_LINUX_KERNEL_IMAGE=y
+
+#include "flash_emmc.config"
+BR2_TARGET_ROOTFS_EXT2_SIZE="1024M"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesont5d_am311/initramfs/ramfslist-32"

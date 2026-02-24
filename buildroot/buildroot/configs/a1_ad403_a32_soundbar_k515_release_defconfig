@@ -1,0 +1,17 @@
+#
+# Copyright (c) 2023 Amlogic, Inc. All rights reserved.
+# This source code is subject to the terms and conditions defined
+# in the file 'LICENSE' which is part of this source code package.
+# Description: ad403 soundbar k515 default config file
+#
+#----------------------------------------------------------#
+#include "arch_a32_10.3.config"
+
+#----------------------------------------------------------#
+#include "a1_ad403_sbr_k515.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesona1_ad403_sbr_k515/initramfs/initramfs-515/ramfslist-32-ubi-release"
+BR2_TARGET_CPIO_INIT_PATH="board/amlogic/mesona1_ad403_sbr_k515"
+BR2_TARGET_RECOVERY_BLACK_LIST="board/amlogic/mesona1_ad403_sbr_k515/recovery_black_list.txt"
+BR2_TARGET_RECOVERY_INITRAMFS_LIST="board/amlogic/mesona1_ad403_sbr_k515/initramfs/initramfs-515/ramfslist-recovery"
+BR2_LINUX_KERNEL_MODULES_SEQUENCE_LIST="board/amlogic/mesona1_ad403_sbr_k515/modules_sequence_list"
+BR2_LINUX_KERNEL_MODULE_SOC_FAMILY="a1"

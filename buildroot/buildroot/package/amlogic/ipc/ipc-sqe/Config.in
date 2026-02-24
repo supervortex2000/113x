@@ -1,0 +1,7 @@
+config BR2_PACKAGE_IPC_SQE
+    bool "ipc sound quality enhancement api library"
+    select  BR2_PACKAGE_WEBRTC_APM	
+    help
+        Support ipc sound quality enhancemnt api library
+
+

@@ -1,0 +1,21 @@
+--- portaudio-v190600_20161030.orig/src/hostapi/alsa/pa_linux_alsa.c	2023-11-06 12:01:53.179032962 +0800
++++ portaudio-v190600_20161030/src/hostapi/alsa/pa_linux_alsa.c	2023-11-06 11:42:56.827472000 +0800
+@@ -2036,12 +2036,12 @@
+ 
+     if( ( result = SetApproximateSampleRate( pcm, hwParams, sr )) != paUnanticipatedHostError )
+     {
+-        ENSURE_( GetExactSampleRate( hwParams, &sr ), paUnanticipatedHostError );
+-        if( result == paInvalidSampleRate ) /* From the SetApproximateSampleRate() call above */
+-        { /* The sample rate was returned as 'out of tolerance' of the one requested */
+-            PA_DEBUG(( "%s: Wanted %.3f, closest sample rate was %.3f\n", __FUNCTION__, sampleRate, sr ));
+-            PA_ENSURE( paInvalidSampleRate );
+-        }
++        //ENSURE_( GetExactSampleRate( hwParams, &sr ), paUnanticipatedHostError );
++      //  if( result == paInvalidSampleRate ) /* From the SetApproximateSampleRate() call above */
++      //  { /* The sample rate was returned as 'out of tolerance' of the one requested */
++      //      PA_DEBUG(( "%s: Wanted %.3f, closest sample rate was %.3f\n", __FUNCTION__, sampleRate, sr ));
++      //      PA_ENSURE( paInvalidSampleRate );
++       // }
+     }
+     else
+     {

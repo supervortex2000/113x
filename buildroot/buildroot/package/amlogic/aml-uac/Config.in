@@ -1,0 +1,5 @@
+config BR2_PACKAGE_AML_UAC
+    bool "aml-uac"
+    default n
+    help
+       support uac function

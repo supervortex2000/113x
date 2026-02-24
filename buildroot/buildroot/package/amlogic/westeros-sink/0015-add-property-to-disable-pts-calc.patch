@@ -1,0 +1,82 @@
+From 120d6ee82f8b1dfbe880f3e5d2c294abc6d4f2f5 Mon Sep 17 00:00:00 2001
+From: Song Zhao <song.zhao@amlogic.com>
+Date: Thu, 1 Apr 2021 00:42:57 -0700
+Subject: [PATCH] add property to disable pts calc
+
+Change-Id: I42854a4732824ee164948928c9c3e94305f0623c
+---
+ westeros-sink/v4l2/westeros-sink-soc.c | 17 +++++++++++++++--
+ westeros-sink/v4l2/westeros-sink-soc.h |  1 +
+ 2 files changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/westeros-sink/v4l2/westeros-sink-soc.c b/westeros-sink/v4l2/westeros-sink-soc.c
+index 416811b..f35e3d9 100644
+--- a/westeros-sink/v4l2/westeros-sink-soc.c
++++ b/westeros-sink/v4l2/westeros-sink-soc.c
+@@ -99,6 +99,7 @@ enum
+   PROP_ZOOM_MODE,
+   PROP_OVERSCAN_SIZE,
+   PROP_ENABLE_TEXTURE,
++  PROP_DISABLE_PTS_CALC,
+   PROP_REPORT_DECODE_ERRORS,
+   PROP_QUEUED_FRAMES
+ };
+@@ -385,6 +386,12 @@ void gst_westeros_sink_soc_class_init(GstWesterosSinkClass *klass)
+                            "enable texture signal",
+                            "0: disable; 1: enable", FALSE, G_PARAM_READWRITE));
+ 
++   g_object_class_install_property (gobject_class, PROP_DISABLE_PTS_CALC,
++     g_param_spec_boolean ("disable-pts-calc",
++                           "disable pts calculation when receive invalid pts",
++                           "0: disable; 1: enable", FALSE, G_PARAM_READWRITE));
++
++
+    g_object_class_install_property (gobject_class, PROP_FORCE_ASPECT_RATIO,
+      g_param_spec_boolean ("force-aspect-ratio",
+                            "force aspect ratio",
+@@ -824,6 +831,9 @@ void gst_westeros_sink_soc_set_property(GObject *object, guint prop_id, const GV
+             }
+          }
+          break;
++      case PROP_DISABLE_PTS_CALC:
++         sink->soc.disable_pts_calc= g_value_get_boolean(value);
++         break;
+       case PROP_REPORT_DECODE_ERRORS:
+          {
+             sink->soc.enableDecodeErrorSignal= g_value_get_boolean(value);
+@@ -886,6 +896,9 @@ void gst_westeros_sink_soc_get_property(GObject *object, guint prop_id, GValue *
+       case PROP_ENABLE_TEXTURE:
+          g_value_set_boolean(value, sink->soc.enableTextureSignal);
+          break;
++      case PROP_DISABLE_PTS_CALC:
++         g_value_set_boolean(value, sink->soc.disable_pts_calc);
++         break;
+       case PROP_REPORT_DECODE_ERRORS:
+          g_value_set_boolean(value, sink->soc.enableDecodeErrorSignal);
+          break;
+@@ -1448,8 +1461,8 @@ void gst_westeros_sink_soc_render( GstWesterosSink *sink, GstBuffer *buffer )
+             }
+          }
+          UNLOCK(sink);
+-      } else {
+-        GST_WARNING("ptsCalc true");
++      } else if (!sink->soc.disable_pts_calc) {
++         GST_WARNING("ptsCalc true");
+          sink->soc.ptsCalc= TRUE;
+       }
+ 
+diff --git a/westeros-sink/v4l2/westeros-sink-soc.h b/westeros-sink/v4l2/westeros-sink-soc.h
+index 471e87a..92388f3 100644
+--- a/westeros-sink/v4l2/westeros-sink-soc.h
++++ b/westeros-sink/v4l2/westeros-sink-soc.h
+@@ -221,6 +221,7 @@ struct _GstWesterosSinkSoc
+    gboolean frameStepOnPreroll;
+    gboolean forceAspectRatio;
+ 
++   gboolean disable_pts_calc;
+    gboolean ptsCalc;
+    gboolean lowMemoryMode;
+    gboolean secureVideo;
+-- 
+2.31.0
+

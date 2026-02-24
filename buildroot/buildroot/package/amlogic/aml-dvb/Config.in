@@ -1,0 +1,7 @@
+config BR2_PACKAGE_AML_DVB
+    select BR2_PACKAGE_AML_ZVBI
+    select BR2_PACKAGE_LIBPLAYER
+    select BR2_PACKAGE_SQLITE
+    bool "aml dvb libs"
+    help
+        aml dvb libs

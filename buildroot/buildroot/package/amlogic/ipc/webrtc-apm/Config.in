@@ -1,0 +1,7 @@
+config BR2_PACKAGE_WEBRTC_APM
+    bool "Webrtc audio processing module library"
+    default n
+    help
+        Support webrtc Audio processing module library
+
+

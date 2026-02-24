@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# when secure keys of factory and secure storage are different,
+# tee_key_inject will re-write the secure key from factory to secure storage.
+#
+
+start() {
+	echo "try to mount factory partition and run tee_key_inject"
+
+	src_str=$(lsblk -f /dev/factory)
+	echo "$src_str"
+
+	mid_str1=$(echo "$src_str" | tr -d "\n" | tr -d "\r" | tr -d " ")
+	mid_str2=$(echo ${mid_str1/"vfat"/""})
+
+	if [ "$mid_str1" != "$mid_str2" ]
+	then
+		mkdir -p /factory
+		mount /dev/factory /factory
+		echo "factory mounted"
+
+		tee_key_inject -p /factory
+	fi
+}
+
+stop() {
+	killall tee_key_inject
+}
+
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart|reload)
+		restart
+		;;
+	*)
+		echo "Usage: $0 {start | stop | restart}"
+		exit 1
+esac
+
+exit $?

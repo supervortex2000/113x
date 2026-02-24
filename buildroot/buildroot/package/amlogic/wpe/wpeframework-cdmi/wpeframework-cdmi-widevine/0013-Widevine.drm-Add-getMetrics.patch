@@ -1,0 +1,141 @@
+From 89ec3b6716721c566b04bfdd21648cccbff9a265 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Tue, 29 Dec 2020 16:50:04 +0800
+Subject: [PATCH] Widevine.drm Add getMetrics
+
+Remove some debug log
+enable Privacy mode
+---
+ MediaSession.cpp |  2 +-
+ MediaSystem.cpp  | 58 +++++++++++++++++++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 54 insertions(+), 6 deletions(-)
+
+diff --git a/MediaSession.cpp b/MediaSession.cpp
+index 0cab296..11ec616 100644
+--- a/MediaSession.cpp
++++ b/MediaSession.cpp
+@@ -385,7 +385,7 @@ CDMi_RESULT MediaKeySession::Decrypt(
+         decryptSample.input.data_length = cbEncrypted;
+         decryptSample.input.subsamples = subsamplesPtr;
+         decryptSample.input.subsamples_length = subSampleCount;                                                                                                                                                                 
+-        printf("line %d, secureHandle : 0x%x, subSampleCount:%d subsampleTotal %d, cbEncrypted %d\n", __LINE__, secureHandle, subSampleCount, subsampleTotal, cbEncrypted);
++        //printf("line %d, secureHandle : 0x%x, subSampleCount:%d subsampleTotal %d, cbEncrypted %d\n", __LINE__, secureHandle, subSampleCount, subsampleTotal, cbEncrypted);
+         if (secureHandle) {
+           decryptSample.output.data = reinterpret_cast<uint8_t*>(secureHandle);
+         } else {
+diff --git a/MediaSystem.cpp b/MediaSystem.cpp
+index d21a17b..7ec2a86 100644
+--- a/MediaSystem.cpp
++++ b/MediaSystem.cpp
+@@ -30,6 +30,7 @@ namespace CDMi {
+ #define MAX_COMPANY_NAME_LENGTH 100
+ char cdmi_company_name[MAX_COMPANY_NAME_LENGTH];
+ char cdmi_product_name[MAX_COMPANY_NAME_LENGTH];
++char cdmi_cert_scope[MAX_COMPANY_NAME_LENGTH];
+ 
+ bool TryGetString(const char* prefix, size_t prefix_len,
+     char* in_value, size_t in_length,
+@@ -54,6 +55,7 @@ bool TryGetString(const char* prefix, size_t prefix_len,
+ bool TryReadFromPropertiesFile(void) {
+   cdmi_company_name[0] = '\0';
+   cdmi_product_name[0] = '\0';
++  cdmi_cert_scope[0] = '\0';
+ 
+   FILE* properties = fopen("/etc/device.properties", "r");
+   if (!properties) {
+@@ -70,8 +72,12 @@ bool TryReadFromPropertiesFile(void) {
+     if (cdmi_product_name[0] == '\0' &&
+         TryGetString("MODEL_NAME=", 11, buffer, size, cdmi_product_name, MAX_COMPANY_NAME_LENGTH))
+       continue;
++    if (cdmi_cert_scope[0] == '\0' &&
++        TryGetString("CERT_SCOPE=", 11, buffer, size, cdmi_cert_scope, MAX_COMPANY_NAME_LENGTH))
++      continue;
+     if (cdmi_company_name[0] != '\0' &&
+-        cdmi_product_name[0] != '\0')
++        cdmi_product_name[0] != '\0' &&
++        cdmi_cert_scope[0] != '\0')
+       break;
+   }
+ 
+@@ -88,6 +94,7 @@ private:
+     WideVine& operator= (const WideVine&) = delete;
+ 
+     typedef std::map<std::string, MediaKeySession*> SessionMap;
++    std::string m_Metrics;
+ 
+     void DoProvision() {
+         bool provisioned = false;
+@@ -164,13 +171,19 @@ public:
+ 
+         if (widevine::Cdm::kSuccess == widevine::Cdm::initialize(
+                 widevine::Cdm::kOpaqueHandle, client_info, &_host, &_host, &_host, static_cast<widevine::Cdm::LogLevel>(0))) {
+-	    // Setting the last parameter to true, requres serviceCertificates so the requests can be encrypted. Currently badly supported
+-            // in the EME tests, so turn of for now :-)
+-            _cdm = widevine::Cdm::create(this, &_host, false);
++            const bool kEnablePrivacyMode = true;
++            _cdm = widevine::Cdm::create(this, &_host, kEnablePrivacyMode);
+         }
+         if (_cdm && !_cdm->isProvisioned()) {
+           DoProvision();
+         }
++
++        if (_cdm) {
++          if (cdmi_cert_scope[0] != '\0')
++            _cdm->setAppParameter("youtube_cert_scope", cdmi_cert_scope);
++          else
++            _cdm->setAppParameter("youtube_cert_scope", "amlogic-2021-amlogictvref");
++        }
+     }
+     virtual ~WideVine() {
+         _adminLock.Lock();
+@@ -231,11 +244,46 @@ public:
+         uint32_t f_cbServerCertificate) {
+ 
+         CDMi_RESULT dr = CDMi_S_FALSE;
+-
++        _adminLock.Lock();
+         std::string serverCertificate(reinterpret_cast<const char*>(f_pbServerCertificate), f_cbServerCertificate);
+         if (widevine::Cdm::kSuccess == _cdm->setServiceCertificate(widevine::Cdm::kAllServices, serverCertificate)) {
+             dr = CDMi_SUCCESS;
+         }
++        _adminLock.Unlock();
++        return dr;
++    }
++
++    virtual CDMi_RESULT GetServerCertificateRequest(
++        std::string& message) {
++        _adminLock.Lock();
++        CDMi_RESULT dr = CDMi_S_FALSE;
++        if (widevine::Cdm::kSuccess == _cdm->getServiceCertificateRequest(&message)) {
++            dr = CDMi_SUCCESS;
++        }
++        _adminLock.Unlock();
++        return dr;
++    }
++
++    virtual CDMi_RESULT ParseServerCertificateResponse(
++        const std::string& response,
++        std::string& certificate) {
++        _adminLock.Lock();
++        CDMi_RESULT dr = CDMi_S_FALSE;
++
++        if (widevine::Cdm::kSuccess == _cdm->parseAndLoadServiceCertificateResponse(widevine::Cdm::kAllServices, response, &certificate)) {
++            dr = CDMi_SUCCESS;
++        }
++        _adminLock.Unlock();
++        return dr;
++    }
++
++    virtual CDMi_RESULT GetMetrics(std::string& metrics) {
++        CDMi_RESULT dr = CDMi_S_FALSE;
++        _adminLock.Lock();
++        if (widevine::Cdm::kSuccess == _cdm->getMetrics(&metrics)) {
++            dr = CDMi_SUCCESS;
++        }
++        _adminLock.Unlock();
+         return dr;
+     }
+ 
+-- 
+2.7.4
+

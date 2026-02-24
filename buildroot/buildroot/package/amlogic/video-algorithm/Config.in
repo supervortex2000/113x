@@ -1,0 +1,32 @@
+menuconfig BR2_PACKAGE_VIDEO_ALGORITHM
+	bool "amlogic video algorithm driver"
+	help
+	  aml video algorithm driver
+
+if BR2_PACKAGE_VIDEO_ALGORITHM
+
+config BR2_PACKAGE_VIDEO_ALGORITHM_DNLP
+	bool "aml video algorithm dnlp driver"
+	default n
+	help
+	  enable aml video algorithm dnlp driver
+
+config BR2_PACKAGE_VIDEO_ALGORITHM_DHR10_TMO
+	bool "aml video algorithm hdr10_tmo driver"
+	default n
+	help
+	  enable aml video algorithm hdr10_tmo driver
+
+config BR2_PACKAGE_VIDEO_ALGORITHM_CABC_AAD
+	bool "aml video algorithm cabc_aad driver"
+	default n
+	help
+	  enable aml video algorithm cabc_aad driver
+
+config BR2_PACKAGE_VIDEO_ALGORITHM_LDIM
+	bool "aml video algorithm ldim driver"
+	default n
+	help
+	  enable aml video algorithm ldim driver
+
+endif

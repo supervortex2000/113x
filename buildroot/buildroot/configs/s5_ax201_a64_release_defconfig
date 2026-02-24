@@ -1,0 +1,11 @@
+#----------------------------------------------------------#
+#include "arch_a64_7.3.1.config"
+
+#----------------------------------------------------------#
+#include "s5_ax201.config"
+#include "flash_emmc.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesons5_ax201/initramfs/ramfslist-64"
+
+BR2_TARGET_ROOTFS_EXT2_SIZE="1024M"
+
+BR2_PACKAGE_VCCKTEST=y

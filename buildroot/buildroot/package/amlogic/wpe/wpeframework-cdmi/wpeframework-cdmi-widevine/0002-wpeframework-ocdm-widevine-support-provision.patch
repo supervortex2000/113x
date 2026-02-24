@@ -1,0 +1,951 @@
+Index: git/FileUtils.cpp
+===================================================================
+--- /dev/null
++++ git/FileUtils.cpp
+@@ -0,0 +1,227 @@
++// Copyright 2018 Google LLC. All Rights Reserved. This file and proprietary
++// source code may only be used and distributed under the Widevine Master
++// License Agreement.
++
++#include <dirent.h>
++#include <errno.h>
++#include <fcntl.h>
++#include <stdio.h>
++#include <sys/sendfile.h>
++#include <sys/stat.h>
++#include <sys/types.h>
++#include <unistd.h>
++#include <cstring>
++#include <core/core.h>
++
++#include "FileUtils.h"
++#include "Platform.h"
++
++namespace CDMi {
++
++bool IsCurrentOrParentDirectory(char* dir) {
++  return strcmp(dir, kCurrentDirectory) == 0 ||
++         strcmp(dir, kParentDirectory) == 0;
++}
++
++bool FileUtils::Exists(const std::string& path) {
++  struct stat buf;
++  int res = stat(path.c_str(), &buf) == 0;
++  if (!res) {
++    TRACE_L4("File::Exists: stat failed: %d, %s", errno, strerror(errno));
++  }
++  return res;
++}
++
++bool FileUtils::Remove(const std::string& path) {
++  if (FileUtils::IsDirectory(path)) {
++    // Handle directory deletion
++    DIR* dir;
++    if ((dir = opendir(path.c_str())) != NULL) {
++      // first remove files and dir within it
++      struct dirent* entry;
++      while ((entry = readdir(dir)) != NULL) {
++        if (!IsCurrentOrParentDirectory(entry->d_name)) {
++          std::string path_to_remove = path + kDirectoryDelimiter;
++          path_to_remove += entry->d_name;
++          if (!Remove(path_to_remove)) {
++            closedir(dir);
++            return false;
++          }
++        }
++      }
++      closedir(dir);
++    }
++    if (rmdir(path.c_str())) {
++      TRACE_L2("File::Remove: rmdir failed: %d, %s", errno, strerror(errno));
++      return false;
++    }
++    return true;
++  } else {
++    size_t wildcard_pos = path.find(kWildcard);
++    if (wildcard_pos == std::string::npos) {
++      // Handle file deletion
++      if (unlink(path.c_str()) && (errno != ENOENT)) {
++        TRACE_L2("File::Remove: unlink failed: %d, %s", errno, strerror(errno));
++        return false;
++      }
++    } else {
++      // Handle wildcard specified file deletion
++      size_t delimiter_pos = path.rfind(kDirectoryDelimiter, wildcard_pos);
++      if (delimiter_pos == std::string::npos) {
++        TRACE_L2("File::Remove: unable to find path delimiter before wildcard");
++        return false;
++      }
++
++      DIR* dir;
++      std::string dir_path = path.substr(0, delimiter_pos);
++      if ((dir = opendir(dir_path.c_str())) == NULL) {
++        TRACE_L2("File::Remove: directory open failed for wildcard");
++        return false;
++      }
++
++      struct dirent* entry;
++      std::string ext = path.substr(wildcard_pos + 1);
++
++      while ((entry = readdir(dir)) != NULL) {
++        size_t filename_len = strlen(entry->d_name);
++        if (filename_len > ext.size()) {
++          if (strcmp(entry->d_name + filename_len - ext.size(), ext.c_str()) ==
++              0) {
++            std::string file_path_to_remove =
++                dir_path + kDirectoryDelimiter + entry->d_name;
++            if (!Remove(file_path_to_remove)) {
++              closedir(dir);
++              return false;
++            }
++          }
++        }
++      }
++      closedir(dir);
++    }
++    return true;
++  }
++}
++
++bool FileUtils::Copy(const std::string& src, const std::string& dest) {
++  struct stat stat_buf;
++  if (stat(src.c_str(), &stat_buf)) {
++    TRACE_L4("File::Copy: file %s stat error: %d, %s", src.c_str(), errno,
++         strerror(errno));
++    return false;
++  }
++
++  int fd_src = open(src.c_str(), O_RDONLY);
++  if (fd_src < 0) {
++    TRACE_L2("File::Copy: unable to open file %s: %d, %s", src.c_str(), errno,
++         strerror(errno));
++    return false;
++  }
++
++  int fd_dest = open(dest.c_str(), O_WRONLY | O_CREAT, stat_buf.st_mode);
++  if (fd_dest < 0) {
++    TRACE_L2("File::Copy: unable to open file %s: %d, %s", dest.c_str(), errno,
++         strerror(errno));
++    close(fd_src);
++    return false;
++  }
++
++  off_t offset = 0;
++  bool status = true;
++  if (sendfile(fd_dest, fd_src, &offset, stat_buf.st_size) < 0) {
++    TRACE_L4("File::Copy: unable to copy %s to %s: %d, %s", src.c_str(),
++         dest.c_str(), errno, strerror(errno));
++    status = false;
++  }
++
++  close(fd_src);
++  close(fd_dest);
++  return status;
++}
++
++bool FileUtils::List(const std::string& path, std::vector<std::string>* files) {
++  if (NULL == files) {
++    TRACE_L4("File::List: files destination not provided");
++    return false;
++  }
++
++  if (!FileUtils::Exists(path)) {
++    TRACE_L4("File::List: path %s does not exist: %d, %s", path.c_str(), errno,
++         strerror(errno));
++    return false;
++  }
++
++  DIR* dir = opendir(path.c_str());
++  if (dir == NULL) {
++    TRACE_L2("File::List: unable to open directory %s: %d, %s", path.c_str(), errno,
++         strerror(errno));
++    return false;
++  }
++
++  files->clear();
++  struct dirent* entry;
++  while ((entry = readdir(dir)) != NULL) {
++    if (!IsCurrentOrParentDirectory(entry->d_name)) {
++      files->push_back(entry->d_name);
++    }
++  }
++  closedir(dir);
++
++  return true;
++}
++
++bool FileUtils::IsRegularFile(const std::string& path) {
++  struct stat buf;
++  if (stat(path.c_str(), &buf) == 0)
++    return buf.st_mode & S_IFREG;
++  else
++    return false;
++}
++
++bool FileUtils::IsDirectory(const std::string& path) {
++  struct stat buf;
++  if (stat(path.c_str(), &buf) == 0)
++    return buf.st_mode & S_IFDIR;
++  else
++    return false;
++}
++
++bool FileUtils::CreateDirectory(const std::string& path_in) {
++  std::string path = path_in;
++  size_t size = path.size();
++  if ((size == 1) && (path[0] == kDirectoryDelimiter)) return true;
++
++  if (size <= 1) return false;
++
++  size_t pos = path.find(kDirectoryDelimiter, 1);
++  while (pos < size) {
++    path[pos] = '\0';
++    if (mkdir(path.c_str(), 0700) != 0) {
++      if (errno != EEXIST) {
++        TRACE_L2("File::CreateDirectory: mkdir failed: %d, %s\n", errno,
++             strerror(errno));
++        return false;
++      }
++    }
++    path[pos] = kDirectoryDelimiter;
++    pos = path.find(kDirectoryDelimiter, pos + 1);
++  }
++
++  if (path[size - 1] != kDirectoryDelimiter) {
++    if (mkdir(path.c_str(), 0700) != 0) {
++      if (errno != EEXIST) {
++        TRACE_L2("File::CreateDirectory: mkdir failed: %d, %s\n", errno,
++             strerror(errno));
++        return false;
++      }
++    }
++  }
++  return true;
++}
++ssize_t FileUtils::FileSize(const std::string& path_in) {
++  struct stat buf;
++  if (stat(path_in.c_str(), &buf) == 0)
++    return buf.st_size;
++  else
++    return -1;
++  }
++}  // namespace CDMi
+Index: git/FileUtils.h
+===================================================================
+--- /dev/null
++++ git/FileUtils.h
+@@ -0,0 +1,29 @@
++// Copyright 2018 Google LLC. All Rights Reserved. This file and proprietary
++// source code may only be used and distributed under the Widevine Master
++// License Agreement.
++
++#include <string>
++#include <vector>
++
++
++namespace CDMi {
++
++const char kCurrentDirectory[] = ".";
++const char kParentDirectory[] = "..";
++const char kDirectoryDelimiter = '/';
++const char kWildcard[] = "*";
++bool IsCurrentOrParentDirectory(char* dir);
++
++class FileUtils {
++ public:
++  static bool Exists(const std::string& src);
++  static bool Remove(const std::string& src);
++  static bool Copy(const std::string& src, const std::string& dest);
++  static bool List(const std::string& path, std::vector<std::string>* files);
++  static bool IsRegularFile(const std::string& path);
++  static bool IsDirectory(const std::string& path);
++  static bool CreateDirectory(const std::string& path);
++  static ssize_t FileSize(const std::string& path_in);
++};
++
++}  // namespace CDMi
+Index: git/HttpSocket.cpp
+===================================================================
+--- git.orig/HttpSocket.cpp
++++ git/HttpSocket.cpp
+@@ -8,6 +8,7 @@
+ #include <fcntl.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <core/core.h>
+ #include "HttpSocket.h"
+ 
+ #ifdef _WIN32
+@@ -52,16 +53,16 @@ SSL_CTX* InitSslContext() {
+   SSL_load_error_strings();
+   const SSL_METHOD* method = TLSv1_2_client_method();
+   SSL_CTX* ctx = SSL_CTX_new(method);
+-  if (!ctx) printf("failed to create SSL context\n");
++  if (!ctx) TRACE_L1("failed to create SSL context");
+   int ret = SSL_CTX_set_cipher_list(
+       ctx, "ALL:!RC4-MD5:!RC4-SHA:!ECDHE-ECDSA-RC4-SHA:!ECDHE-RSA-RC4-SHA");
+-  if (0 == ret) printf("error disabling vulnerable ciphers\n");
++  if (0 == ret) TRACE_L1("error disabling vulnerable ciphers");
+   return ctx;
+ }
+ 
+ static int LogBoringSslError(
+     const char* message, size_t length, void* /* user_data */) {
+-  printf("  BoringSSL Error: %s\n", message);
++  TRACE_L1("  BoringSSL Error: %s", message);
+   return length;
+ }
+ 
+@@ -86,7 +87,7 @@ void ShowServerCertificate(const SSL* ss
+     free(line);
+     X509_free(cert);
+   } else {
+-    printf("Failed to get server certificate\n");
++    TRACE_L1("Failed to get server certificate");
+   }
+ }
+ #endif
+@@ -114,10 +115,10 @@ bool SocketWait(int fd, bool for_read, i
+ 
+   int ret = select(fd + 1, read_fds, write_fds, NULL, &tv);
+   if (ret == 0) {
+-    printf("socket timed out\n");
++    TRACE_L1("socket timed out");
+     return false;
+   } else if (ret == -1) {
+-    printf("select failed, errno = %d\n", errno);
++    TRACE_L1("select failed, errno = %d", errno);
+     return false;
+   }
+ 
+@@ -164,7 +165,7 @@ bool HttpSocket::ParseUrl(const std::str
+   size_t offset = 0;
+ 
+   if (!Tokenize(url, "://", offset, scheme, &offset)) {
+-    printf("Invalid URL, scheme not found: %s\n", url.c_str());
++    TRACE_L1("Invalid URL, scheme not found: %s", url.c_str());
+     return false;
+   }
+ 
+@@ -177,7 +178,7 @@ bool HttpSocket::ParseUrl(const std::str
+     *secure_connect = true;
+     port->assign("443");
+   } else {
+-    printf("Invalid URL, scheme not supported: %s\n", url.c_str());
++    TRACE_L1("Invalid URL, scheme not supported: %s", url.c_str());
+     return false;
+   }
+ 
+@@ -198,7 +199,7 @@ bool HttpSocket::ParseUrl(const std::str
+     port->assign(domain_name->c_str() + port_offset);
+     int port_num = atoi(port->c_str());
+     if (port_num <= 0 || port_num >= 65536) {
+-      printf("Invalid URL, port not valid: %s\n", url.c_str());
++      TRACE_L1("Invalid URL, port not valid: %s", url.c_str());
+       return false;
+     }
+     domain_name->assign(domain_name_without_port);
+@@ -246,7 +247,7 @@ bool HttpSocket::Connect(int timeout_in_
+     WSADATA ignored_data;
+     int err = WSAStartup(MAKEWORD(2, 2), &ignored_data);
+     if (err != 0) {
+-      printf("Error in WSAStartup: %d\n", err);
++      TRACE_L1("Error in WSAStartup: %d", err);
+       return false;
+     }
+     initialized = true;
+@@ -264,7 +265,7 @@ bool HttpSocket::Connect(int timeout_in_
+   int ret = getaddrinfo(domain_name_.c_str(), port_.c_str(), &hints,
+                         &addr_info);
+   if (ret != 0) {
+-    printf("getaddrinfo failed, errno = %d\n", ret);
++    TRACE_L1("getaddrinfo failed, errno = %d", ret);
+     return false;
+   }
+ 
+@@ -272,7 +273,7 @@ bool HttpSocket::Connect(int timeout_in_
+   socket_fd_ = socket(addr_info->ai_family, addr_info->ai_socktype,
+                       addr_info->ai_protocol);
+   if (socket_fd_ < 0) {
+-    printf("cannot open socket, errno = %d\n", GetError());
++    TRACE_L1("cannot open socket, errno = %d", GetError());
+     return false;
+   }
+ 
+@@ -280,19 +281,19 @@ bool HttpSocket::Connect(int timeout_in_
+ #ifdef _WIN32
+   u_long mode = 1;  // Non-blocking mode.
+   if (ioctlsocket(socket_fd_, FIONBIO, &mode) != 0) {
+-    printf("ioctlsocket error, wsa error = %d\n", WSAGetLastError());
++    TRACE_L1("ioctlsocket error, wsa error = %d", WSAGetLastError());
+     CloseSocket();
+     return false;
+   }
+ #else
+   int original_flags = fcntl(socket_fd_, F_GETFL, 0);
+   if (original_flags == -1) {
+-    printf("fcntl error, errno = %d\n", errno);
++    TRACE_L1("fcntl error, errno = %d", errno);
+     CloseSocket();
+     return false;
+   }
+   if (fcntl(socket_fd_, F_SETFL, original_flags | O_NONBLOCK) == -1) {
+-    printf("fcntl error, errno = %d\n", errno);
++    TRACE_L1("fcntl error, errno = %d", errno);
+     CloseSocket();
+     return false;
+   }
+@@ -307,13 +308,13 @@ bool HttpSocket::Connect(int timeout_in_
+   } else {
+     if (GetError() != ERROR_ASYNC_COMPLETE) {
+       // failed right away.
+-      printf("cannot connect to %s, errno = %d\n", domain_name_.c_str(), GetError());
++      TRACE_L1("cannot connect to %s, errno = %d", domain_name_.c_str(), GetError());
+       CloseSocket();
+       return false;
+     } else {
+       // in progress.  block until timeout expired or connection established.
+       if (!SocketWait(socket_fd_, /* for_read */ false, timeout_in_ms)) {
+-        printf("cannot connect to %s\n", domain_name_.c_str());
++        TRACE_L1("cannot connect to %s", domain_name_.c_str());
+         CloseSocket();
+         return false;
+       }
+@@ -330,14 +331,14 @@ bool HttpSocket::Connect(int timeout_in_
+ 
+     ssl_ = SSL_new(ssl_ctx_);
+     if (!ssl_) {
+-      printf("failed SSL_new\n");
++      TRACE_L1("failed SSL_new");
+       CloseSocket();
+       return false;
+     }
+ 
+     BIO* a_bio = BIO_new_socket(socket_fd_, BIO_NOCLOSE);
+     if (!a_bio) {
+-      printf("BIO_new_socket error\n");
++      TRACE_L1("BIO_new_socket error");
+       CloseSocket();
+       return false;
+     }
+@@ -349,13 +350,13 @@ bool HttpSocket::Connect(int timeout_in_
+         int ssl_err = SSL_get_error(ssl_, ret);
+         if (ssl_err != SSL_ERROR_WANT_READ && ssl_err != SSL_ERROR_WANT_WRITE) {
+           char buf[256];
+-          printf("SSL_connect error: %s\n", ERR_error_string(ERR_get_error(), buf));
++          TRACE_L1("SSL_connect error: %s", ERR_error_string(ERR_get_error(), buf));
+           CloseSocket();
+           return false;
+         }
+         bool for_read = ssl_err == SSL_ERROR_WANT_READ;
+         if (!SocketWait(socket_fd_, for_read, timeout_in_ms)) {
+-          printf("cannot connect to %s\n", domain_name_.c_str());
++          TRACE_L1("cannot connect to %s", domain_name_.c_str());
+           CloseSocket();
+           return false;
+         }
+@@ -374,12 +375,12 @@ int HttpSocket::Read(char* data, int len
+   int to_read = len;
+ 
+   if (socket_fd_ == -1) {
+-    printf("Socket to %s not open.  Cannot read.\n", domain_name_.c_str());
++    TRACE_L1("Socket to %s not open.  Cannot read.", domain_name_.c_str());
+     return -1;
+   }
+   while (to_read > 0) {
+     if (!SocketWait(socket_fd_, /* for_read */ true, timeout_in_ms)) {
+-      printf("unable to read from %s\n", domain_name_.c_str());
++      TRACE_L1("unable to read from %s", domain_name_.c_str());
+       return -1;
+     }
+ 
+@@ -408,9 +409,9 @@ int HttpSocket::Read(char* data, int len
+         // After sleeping, fall through to iterate the loop again and retry.
+       } else {
+         // Unrecoverable error. Log and abort.
+-        printf("SSL_read returned %d, LibSSL Error = %d\n", read, ssl_error);
++        TRACE_L1("SSL_read returned %d, LibSSL Error = %d", read, ssl_error);
+         if (ssl_error == SSL_ERROR_SYSCALL) {
+-          printf("  errno = %d = %s\n", GetError(), GetErrorString());
++          TRACE_L1("  errno = %d = %s", GetError(), GetErrorString());
+         }
+         ERR_print_errors_cb(LogBoringSslError, NULL);
+         return -1;
+@@ -422,7 +423,7 @@ int HttpSocket::Read(char* data, int len
+         break;
+       } else {
+         // Log the error received
+-        printf("recv returned %d, errno = %d = %s\n", read, GetError(),
++        TRACE_L1("recv returned %d, errno = %d = %s", read, GetError(),
+              GetErrorString());
+         return -1;
+       }
+@@ -440,7 +441,7 @@ int HttpSocket::Write(const char* data,
+   int to_send = len;
+ 
+   if (socket_fd_ == -1) {
+-    printf("Socket to %s not open. Cannot write.\n", domain_name_.c_str());
++    TRACE_L1("Socket to %s not open. Cannot write.", domain_name_.c_str());
+     return -1;
+   }
+   while (to_send > 0) {
+@@ -457,11 +458,11 @@ int HttpSocket::Write(const char* data,
+     } else if (sent == 0) {
+       // We filled up the pipe.  Wait for room to write.
+       if (!SocketWait(socket_fd_, /* for_read */ false, timeout_in_ms)) {
+-        printf("unable to write to %s\n", domain_name_.c_str());
++        TRACE_L1("unable to write to %s", domain_name_.c_str());
+         return -1;
+       }
+     } else {
+-      printf("send returned %d, errno = %d\n", sent, GetError());
++      TRACE_L1("send returned %d, errno = %d", sent, GetError());
+       return -1;
+     }
+   }
+Index: git/LicenseRequest.cpp
+===================================================================
+--- git.orig/LicenseRequest.cpp
++++ git/LicenseRequest.cpp
+@@ -2,6 +2,7 @@
+ // source code may only be used and distributed under the Widevine Master
+ // License Agreement.
+ 
++#include <core/core.h>
+ #include "LicenseRequest.h"
+ 
+ namespace CDMi {
+@@ -43,7 +44,7 @@ void LicenseRequest::GetDrmMessage(const
+         drm_msg_pos += kTwoBlankLines.size();  // points to drm message
+         drm_msg = response.substr(drm_msg_pos);
+       } else {
+-        printf("Message had GLS marker, but did not have extra blank line.\n");
++        TRACE_L1("Message had GLS marker, but did not have extra blank line.");
+         drm_msg = response.substr(header_end_pos);
+       }
+     } else {
+@@ -52,7 +53,7 @@ void LicenseRequest::GetDrmMessage(const
+       drm_msg = response.substr(header_end_pos);
+     }
+   } else {
+-    printf("response body not found\n");
++    TRACE_L1("response body not found");
+   }
+ }
+ 
+Index: git/UrlRequest.cpp
+===================================================================
+--- git.orig/UrlRequest.cpp
++++ git/UrlRequest.cpp
+@@ -2,9 +2,9 @@
+ // source code may only be used and distributed under the Widevine Master
+ // License Agreement.
+ 
+-
+ #include <errno.h>
+ #include <sstream>
++#include <core/core.h>
+ 
+ #include "UrlRequest.h"
+ #include "HttpSocket.h"
+@@ -36,7 +36,7 @@ void ConcatenateChunkedResponse(const st
+     sscanf(&http_response[chunk_size_pos], "%zx", &chunk_size);
+     if (chunk_size > http_response.size()) {
+       // precaution, in case we misread chunk size
+-      printf("invalid chunk size %u\n", chunk_size);
++      TRACE_L1("invalid chunk size %u", chunk_size);
+       return;
+     }
+ 
+@@ -60,7 +60,7 @@ void ConcatenateChunkedResponse(const st
+       sscanf(&http_response[chunk_size_pos], "%zx", &chunk_size);
+       if (chunk_size > http_response.size()) {
+         // precaution, in case we misread chunk size
+-        printf("invalid chunk size %u\n", chunk_size);
++        TRACE_L1("invalid chunk size %u", chunk_size);
+         break;
+       }
+       chunk_pos = http_response.find(kCrLf, chunk_size_pos);
+@@ -86,7 +86,7 @@ void UrlRequest::Reconnect() {
+     if (socket_.Connect(kConnectTimeoutMs)) {
+       is_connected_ = true;
+     } else {
+-      printf("failed to connect to %s, port=%d\n", socket_.domain_name().c_str(),
++      TRACE_L1("failed to connect to %s, port=%d", socket_.domain_name().c_str(),
+            socket_.port());
+     }
+   }
+@@ -104,7 +104,7 @@ bool UrlRequest::GetResponse(std::string
+     if (bytes > 0) {
+       response.append(read_buffer, bytes);
+     } else if (bytes < 0) {
+-      printf("read error, errno = %d\n", errno);
++      TRACE_L1("read error, errno = %d", errno);
+       return false;
+     } else {
+       // end of stream.
+Index: git/CMakeLists.txt
+===================================================================
+--- git.orig/CMakeLists.txt
++++ git/CMakeLists.txt
+@@ -22,7 +22,8 @@ set(PLUGIN_SOURCES
+     MediaSystem.cpp
+     HttpSocket.cpp
+     LicenseRequest.cpp
+-    UrlRequest.cpp)
++    UrlRequest.cpp
++    FileUtils.cpp)
+ 
+ # add the library
+ add_library(${PLUGIN_NAME} SHARED ${PLUGIN_SOURCES})
+Index: git/HostImplementation.cpp
+===================================================================
+--- git.orig/HostImplementation.cpp
++++ git/HostImplementation.cpp
+@@ -1,18 +1,18 @@
+ #include "HostImplementation.h"
+-#include "DeviceCertificate.h"
++#include "FileUtils.h"
+ 
+ using namespace widevine;
+ using namespace WPEFramework;
+ 
+-namespace {
+-  const std::string kCertificateFilename = "cert.bin";
+-}  // namespace
+-
+ namespace CDMi {
+ 
+-HostImplementation::HostImplementation() 
+-  : _saveDeviceCert(false)
+-  , _timer(Core::Thread::DefaultStackSize(),  _T("widevine"))
++const std::string kCertificateFilename = "cert.bin";
++const std::string kBasePathPrefix = "/opt/WideVine";
++uint8_t *kDeviceCert = NULL;
++size_t kDeviceCertSize = 0;
++
++HostImplementation::HostImplementation()
++  : _timer(Core::Thread::DefaultStackSize(),  _T("widevine"))
+   , _files() {
+   Reset();
+ }
+@@ -22,10 +22,13 @@ HostImplementation::~HostImplementation(
+ 
+ void HostImplementation::Reset() {
+ 
+-  _saveDeviceCert = false;
+-
+   _files.clear();
+-  _files[kCertificateFilename.c_str()] = std::string(reinterpret_cast<const char*>(kDeviceCert), kDeviceCertSize);
++  if (LoadCert()) {
++    _files[kCertificateFilename.c_str()] = std::string(reinterpret_cast<const char*>(kDeviceCert), kDeviceCertSize);
++  } else {
++      TRACE_L1("load cert failed");
++  }
++
+ }
+ 
+ int HostImplementation::NumTimers() const { 
+@@ -46,8 +49,8 @@ int HostImplementation::NumTimers() cons
+ /* virtual */ bool HostImplementation::write(const std::string& name, const std::string& data) {
+   TRACE_L1("write file: %s", name.c_str());
+   _files[name] = data;
+-  if (_saveDeviceCert && kCertificateFilename.compare(name) == 0) {
+-    _saveDeviceCert = false;
++  if (kCertificateFilename.compare(name) == 0) {
++    SaveCert(data.c_str(), data.size());
+   }
+   return true;
+ }
+@@ -105,4 +108,59 @@ int HostImplementation::NumTimers() cons
+   _timer.Revoke(Timer(client, nullptr));
+ }
+ 
++bool HostImplementation::LoadCert() {
++  const std::string kCertificatePath = kBasePathPrefix + kDirectoryDelimiter + kCertificateFilename;
++  ssize_t fileSize = 0;
++  if (kDeviceCert) {
++    free(kDeviceCert);
++  }
++  kDeviceCertSize = 0;
++
++  if (!FileUtils::Exists(kBasePathPrefix)) {
++    TRACE_L1("%s not exist", kBasePathPrefix.c_str());
++    return false;
++  }
++
++  if (!FileUtils::Exists(kCertificatePath)) {
++    TRACE_L1("%s not exist", kCertificatePath.c_str());
++    return false;
++  }
++
++  fileSize = FileUtils::FileSize(kCertificatePath);
++  TRACE_L2("%s size %d", kCertificatePath.c_str(), fileSize);
++  if (fileSize <= 0) {
++    return false;
++  }
++
++  kDeviceCert = (uint8_t *)malloc(fileSize + 1);
++  if (!kDeviceCert) {
++    return false;
++  }
++  FILE* file = fopen(kCertificatePath.c_str(), "rb");
++  if (!file) {
++    TRACE_L1("%s open failed", kCertificatePath.c_str());
++    return false;
++  }
++  size_t r = fread(kDeviceCert, 1, fileSize, file);
++  TRACE_L2("%s read %d", kCertificatePath.c_str(), r);
++  kDeviceCertSize = r;
++  fclose(file);
++  return true;
++}
++
++bool HostImplementation::SaveCert(const char *data, size_t length) {
++  bool ret = false;
++  const std::string kCertificatePath = kBasePathPrefix + kDirectoryDelimiter + kCertificateFilename;
++  if (!FileUtils::Exists(kBasePathPrefix)) {
++    FileUtils::CreateDirectory(kBasePathPrefix);
++  }
++  FILE* file = fopen(kCertificatePath.c_str(), "w+");
++  if (!file) {
++    return false;
++  }
++  size_t r = fwrite(data, length, 1, file);
++  fclose(file);
++  return r == length;
++}
++
+ } // namespace CDMi
+Index: git/HostImplementation.h
+===================================================================
+--- git.orig/HostImplementation.h
++++ git/HostImplementation.h
+@@ -1,9 +1,8 @@
+ #ifndef WIDEVINE_HOST_IMPLEMENTATION_H
+ #define WIDEVINE_HOST_IMPLEMENTATION_H
+ 
+-#include "cdm.h"
+-
+ #include <core/core.h>
++#include "cdm.h"
+ 
+ namespace CDMi {
+ 
+@@ -62,9 +61,6 @@ public:
+   // Add methods for testing purpose. No real-life functionality.
+   void Reset();
+   int NumTimers() const;
+-  inline void SaveProvisioningInformation() { 
+-    _saveDeviceCert = true; 
+-  }
+  
+   // widevine::Cdm::IStorage implementation
+   // ---------------------------------------------------------------------------
+@@ -85,7 +81,8 @@ public:
+   virtual void cancel(IClient* client) override;
+ 
+ private:
+-  bool _saveDeviceCert;
++  bool LoadCert();
++  bool SaveCert(const char *data, size_t length);
+   WPEFramework::Core::TimerType<Timer> _timer;
+   StorageMap _files;
+ };
+Index: git/MediaSystem.cpp
+===================================================================
+--- git.orig/MediaSystem.cpp
++++ git/MediaSystem.cpp
+@@ -27,52 +27,6 @@
+ 
+ namespace CDMi {
+ 
+-bool Fetch(const std::string& url,
+-         const std::string& message,
+-         std::string* response,
+-         int* status_code) {
+-    UrlRequest url_request(url);
+-    if (!url_request.is_connected()) {
+-      return false;
+-    }
+-    url_request.PostRequest(message);
+-    std::string http_response;
+-    url_request.GetResponse(&http_response);
+-    // Some license servers return 400 for invalid message, some
+-    // return 500; treat anything other than 200 as an invalid message.
+-    int http_status_code = url_request.GetStatusCode(http_response);
+-    if (status_code) {
+-      *status_code = http_status_code;
+-    }
+-
+-    if (response) {
+-      if (http_status_code == 200 ) {
+-        // Parse out HTTP and server headers and return the body only.
+-        std::string reply_body;
+-        LicenseRequest lic_request;
+-        lic_request.GetDrmMessage(http_response, reply_body);
+-        *response = reply_body;
+-      } else {
+-        *response = http_response;
+-      }
+-    //printf("Reply body: %s", b2a_hex(*response).c_str());
+-    }
+-    return true;
+-}
+-
+-bool GetProvisioningResponse(const std::string& message, std::string& respose)
+-{
+-    bool fetch_flag = false;
+-    int status_code;
+-
+-    //std::cout <<" GetProvisioning : " <<  message << std::endl;
+-    std::string url = "https://www.googleapis.com/certificateprovisioning/v1/devicecertificates/create"
+-            "?key=AIzaSyB-5OLKTx2iU5mko18DfdwK5611JIjbUhE&signedRequest=";
+-    url.append(message.c_str());
+-    fetch_flag = Fetch(url, "", &respose, &status_code);
+-    return fetch_flag;
+-}
+-
+ class WideVine : public IMediaKeys, public widevine::Cdm::IEventListener
+ {
+ private:
+@@ -81,6 +35,41 @@ private:
+ 
+     typedef std::map<std::string, MediaKeySession*> SessionMap;
+ 
++    void DoProvision() {
++        bool provisioned = false;
++        std::string message;
++        std::string response;
++        std::string body;
++        LicenseRequest lic_request;
++        std::string url =
++                "https://www.googleapis.com/certificateprovisioning/v1/devicecertificates/create"
++                        "?key=AIzaSyB-5OLKTx2iU5mko18DfdwK5611JIjbUhE&signedRequest=";
++        ASSERT_LOGGER("Start Provision\n");
++        if (!_cdm->getProvisioningRequest(&message)) {
++            url.append(message.c_str());
++            UrlRequest url_request(url);
++            if (url_request.is_connected()) {
++                url_request.PostRequest("");
++                url_request.GetResponse(&response);
++                if (200 == url_request.GetStatusCode(response)) {
++                    lic_request.GetDrmMessage(response, body);
++                    if (!_cdm->handleProvisioningResponse(body)) {
++                        provisioned = true;
++                    } else {
++                        ASSERT_LOGGER("handleProvisioningResponse failed\n");
++                    }
++                } else {
++                    ASSERT_LOGGER("Error StatusCode %d\n", url_request.GetStatusCode(response));
++                }
++            } else {
++                ASSERT_LOGGER("url_request failed\n");
++            }
++        } else {
++            ASSERT_LOGGER("getProvisioningRequest failed\n");
++        }
++        ASSERT_LOGGER("Provision %s\n", provisioned ? "Success" : "Failed");
++    }
++
+ public:
+     WideVine()
+         : _adminLock()
+@@ -117,13 +106,8 @@ public:
+             // in the EME tests, so turn of for now :-)
+             _cdm = widevine::Cdm::create(this, &_host, false);
+         }
+-        if (_cdm /* && !_cdm->isProvisioned()*/) {
+-            std::string message;
+-            std::string response;
+-            _cdm->getProvisioningRequest(&message);
+-            if (GetProvisioningResponse(message, response) == true) {
+-                _cdm->handleProvisioningResponse(response);
+-            }
++        if (_cdm && !_cdm->isProvisioned()) {
++          DoProvision();
+         }
+     }
+     virtual ~WideVine() {
+Index: git/HttpSocket.h
+===================================================================
+--- git.orig/HttpSocket.h
++++ git/HttpSocket.h
+@@ -2,8 +2,8 @@
+ // source code may only be used and distributed under the Widevine Master
+ // License Agreement.
+ 
+-#ifndef CDM_TEST_HTTP_SOCKET_H_
+-#define CDM_TEST_HTTP_SOCKET_H_
++#ifndef WIDEVINE_HTTP_SOCKET_H_
++#define WIDEVINE_HTTP_SOCKET_H_
+ 
+ #include <stdlib.h>
+ #include <string>
+@@ -49,4 +49,4 @@ class HttpSocket {
+ 
+ }  // namespace CDMi
+ 
+-#endif  // CDM_TEST_HTTP_SOCKET_H_
++#endif  // WIDEVINE_HTTP_SOCKET_H_
+Index: git/LicenseRequest.h
+===================================================================
+--- git.orig/LicenseRequest.h
++++ git/LicenseRequest.h
+@@ -2,8 +2,8 @@
+ // source code may only be used and distributed under the Widevine Master
+ // License Agreement.
+ 
+-#ifndef CDM_TEST_LICENSE_REQUEST_H_
+-#define CDM_TEST_LICENSE_REQUEST_H_
++#ifndef WIDEVINE_LICENSE_REQUEST_H_
++#define WIDEVINE_LICENSE_REQUEST_H_
+ 
+ #include <string>
+ 
+@@ -26,4 +26,4 @@ class LicenseRequest {
+ 
+ }  // namespace CDMi
+ 
+-#endif  // CDM_TEST_LICENSE_REQUEST_H_
++#endif  // WIDEVINE_LICENSE_REQUEST_H_
+Index: git/UrlRequest.h
+===================================================================
+--- git.orig/UrlRequest.h
++++ git/UrlRequest.h
+@@ -2,8 +2,8 @@
+ // source code may only be used and distributed under the Widevine Master
+ // License Agreement.
+ 
+-#ifndef CDM_TEST_URL_REQUEST_H_
+-#define CDM_TEST_URL_REQUEST_H_
++#ifndef WIDEVINE_URL_REQUEST_H_
++#define WIDEVINE_URL_REQUEST_H_
+ 
+ #include <string>
+ #include "HttpSocket.h"
+@@ -36,4 +36,4 @@ class UrlRequest {
+ 
+ }  // namespace CDMi
+ 
+-#endif  // CDM_TEST_URL_REQUEST_H_
++#endif  // WIDEVINE_URL_REQUEST_H_
+Index: git/MediaSession.cpp
+===================================================================
+--- git.orig/MediaSession.cpp
++++ git/MediaSession.cpp
+@@ -370,12 +370,13 @@ CDMi_RESULT MediaKeySession::Decrypt(
+         input.key_id_length = (it->first).size();
+         input.iv = m_IV;
+         input.iv_length = sizeof(m_IV);
+-        input.is_video = true;
+ 
+         if (secureHandle) {
++          input.is_video = true;
+           output.data = reinterpret_cast<uint8_t*>(secureHandle);
+           output.is_secure = true;
+         } else {
++          input.is_video = false;
+           outputBuffer = (uint8_t*) malloc(cbEncrypted * sizeof(uint8_t));
+           output.data = outputBuffer;
+           output.data_offset = 0;

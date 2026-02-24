@@ -1,0 +1,5 @@
+config BR2_PACKAGE_AML_SWUPDATE_UI
+    bool  "swupdate ui"
+    default n
+    help
+        display the process of recovery.

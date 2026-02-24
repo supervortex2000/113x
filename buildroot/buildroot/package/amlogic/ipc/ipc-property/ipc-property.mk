@@ -1,0 +1,45 @@
+#############################################################
+#
+# IPC Property
+#
+#############################################################
+
+IPC_PROPERTY_VERSION = 1.0
+IPC_PROPERTY_SITE = $(TOPDIR)/../vendor/amlogic/ipc/ipc_property
+IPC_PROPERTY_SITE_METHOD = local
+IPC_PROPERTY_DEPENDENCIES = ipc-property-json
+IPC_PROPERTY_INSTALL_STAGING = YES
+
+define IPC_PROPERTY_PREPARE_JSON_LIB
+	mkdir -p $(@D)/json
+	$(INSTALL) -D -m 644 $(IPC_PROPERTY_JSON_DL_DIR)/json.hpp $(@D)/json/
+endef
+
+IPC_PROPERTY_PRE_CONFIGURE_HOOKS += IPC_PROPERTY_PREPARE_JSON_LIB
+
+IPC_PROPERTY_GIT_VERSION=$(shell \
+			if [ -d $(IPC_PROPERTY_SITE)/.git ]; then \
+			   git -C $(IPC_PROPERTY_SITE) describe --abbrev=8 --dirty --always --tags; \
+			else \
+			   echo "unknown"; \
+			fi)
+
+define IPC_PROPERTY_BUILD_CMDS
+	REVISION=$(IPC_PROPERTY_GIT_VERSION) $(TARGET_CONFIGURE_OPTS) $(TARGET_MAKE_ENV) $(MAKE) -C $(@D)
+endef
+
+define IPC_PROPERTY_INSTALL_STAGING_CMDS
+	$(INSTALL) -D -m 644 $(@D)/libipc-property.so $(STAGING_DIR)/usr/lib/
+	$(INSTALL) -D -m 644 $(@D)/include/ipc_property.h $(STAGING_DIR)/usr/include/
+endef
+
+define IPC_PROPERTY_INSTALL_TARGET_CMDS
+	$(INSTALL) -D -m 755 $(@D)/ipc-property $(TARGET_DIR)/usr/bin/
+	$(INSTALL) -D -m 755 $(@D)/ipc-property-service $(TARGET_DIR)/usr/bin/
+	$(INSTALL) -D -m 644 $(@D)/libipc-property.so $(TARGET_DIR)/usr/lib/
+	$(INSTALL) -D -m 755 $(@D)/startup.sh $(TARGET_DIR)/etc/init.d/S45ipc-property
+endef
+
+$(eval $(generic-package))
+
+include $(IPC_PROPERTY_PKGDIR)/ipc-property-json/*.mk

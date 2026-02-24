@@ -1,0 +1,14 @@
+#
+# Copyright (c) 2023 Amlogic, Inc. All rights reserved.
+# This source code is subject to the terms and conditions defined
+# in the file 'LICENSE' which is part of this source code package.
+# Description:  modules file
+#
+dwc3
+dwc_otg
+# media modules
+media_clock
+firmware
+video_framerate_adapter
+decoder_common
+stream_input

@@ -1,0 +1,26 @@
+#----------------------------------------------------------#
+#include "arch_a32_7.3.1.config"
+
+#----------------------------------------------------------#
+#include "a213y_au401.config"
+#include "flash_emmc.config"
+
+#----------------------------------------------------------#
+# for alexa smart screen SDK feature
+# ass include avs, so neednot include avs.config here
+#include "ass.config"
+
+#-----------------browser config--------------------------#
+#include "browser.config"
+
+#----------------------------------------------------------#
+
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesona213y_au401/initramfs/ramfslist-32"
+BR2_TARGET_RECOVERY_INITRAMFS_LIST="board/amlogic/mesona213y_au401/initramfs/ramfslist-32-recovery"
+
+#--------------Please add new config here-----------------#
+BR2_PACKAGE_MDNSRESPONDER=y
+
+#--------------Overwrite Config Here-----------------#
+BR2_LINUX_KERNEL_INTREE_DTS_NAME="mesona213y_au40a1_1g"
+BR2_TARGET_UBOOT_BOARDNAME="m8b_a213y_au40a1"

@@ -1,0 +1,65 @@
+From 77ea9a53e9bd7ab53741321bf2fb8a0a6179c9fa Mon Sep 17 00:00:00 2001
+From: Song Zhao <song.zhao@amlogic.com>
+Date: Tue, 27 Apr 2021 20:33:21 -0700
+Subject: [PATCH 1/2] add missing locking
+
+---
+ westeros-sink/raw/westeros-sink-soc.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/westeros-sink/raw/westeros-sink-soc.c b/westeros-sink/raw/westeros-sink-soc.c
+index eef86e7..cc503b3 100644
+--- a/westeros-sink/raw/westeros-sink-soc.c
++++ b/westeros-sink/raw/westeros-sink-soc.c
+@@ -1076,7 +1076,9 @@ void gst_westeros_sink_soc_render( GstWesterosSink *sink, GstBuffer *buffer )
+ 
+             if ( !sink->soc.conn && (sink->soc.frameOutCount == 0))
+             {
++               LOCK(sink);
+                sink->soc.firstFrameThread= g_thread_new("westeros_first_frame", wstFirstFrameThread, sink);
++               UNLOCK(sink);
+             }
+ 
+             drmBuff->frameTime= ((GST_BUFFER_PTS(buffer) + 500LL) / 1000LL);
+@@ -2350,12 +2352,16 @@ static void wstProcessMessagesVideoClientConnection( WstVideoClientConnection *c
+          if ( sink->soc.emitFirstFrameSignal )
+          {
+             sink->soc.emitFirstFrameSignal= FALSE;
++            LOCK(sink);
+             sink->soc.firstFrameThread= g_thread_new("westeros_first_frame", wstFirstFrameThread, sink);
++            UNLOCK(sink);
+          }
+          if ( sink->soc.emitUnderflowSignal )
+          {
+             sink->soc.emitUnderflowSignal= FALSE;
++            LOCK(sink);
+             sink->soc.underflowThread= g_thread_new("westeros_underflow", wstUnderflowThread, sink);
++            UNLOCK(sink);
+          }
+       }
+    }
+@@ -2617,8 +2623,10 @@ static gpointer wstFirstFrameThread(gpointer data)
+    {
+       GST_DEBUG("wstFirstFrameThread: emit first frame signal");
+       g_signal_emit (G_OBJECT (sink), g_signals[SIGNAL_FIRSTFRAME], 0, 2, NULL);
++      LOCK(sink);
+       g_thread_unref( sink->soc.firstFrameThread );
+       sink->soc.firstFrameThread= NULL;
++      UNLOCK(sink);
+    }
+ 
+    return NULL;
+@@ -2632,8 +2640,10 @@ static gpointer wstUnderflowThread(gpointer data)
+    {
+       GST_DEBUG("wstUnderflowThread: emit underflow signal");
+       g_signal_emit (G_OBJECT (sink), g_signals[SIGNAL_UNDERFLOW], 0, 0, NULL);
++      LOCK(sink);
+       g_thread_unref( sink->soc.underflowThread );
+       sink->soc.underflowThread= NULL;
++      UNLOCK(sink);
+    }
+ 
+    return NULL;
+-- 
+2.24.1
+

@@ -1,0 +1,8 @@
+#----------------------------------------------------------#
+#include "arch_a64_10.2.config"
+
+#----------------------------------------------------------#
+#include "c2_af400_k510.config"
+#include "flash_emmc.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesonc2_af400_k510/initramfs/ramfslist-64"
+

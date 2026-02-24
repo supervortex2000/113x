@@ -1,0 +1,35 @@
+From db2f522a52f5950aa52ff187560c7bfb56dc90e7 Mon Sep 17 00:00:00 2001
+From: "pengbing.deng" <pengbing.deng@amlogic.com>
+Date: Fri, 5 Mar 2021 12:58:54 +0800
+Subject: [PATCH 11/12] westeros-drm-westeros-gl mod
+
+Change-Id: I7754a4de3c738096a001b5fb6c50a36901762b50
+---
+ drm/westeros-gl/westeros-gl.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drm/westeros-gl/westeros-gl.c b/drm/westeros-gl/westeros-gl.c
+index 63b05f9..aea220d 100644
+--- a/drm/westeros-gl/westeros-gl.c
++++ b/drm/westeros-gl/westeros-gl.c
+@@ -5130,7 +5130,7 @@ static void wstSwapDRMBuffersAtomic( WstGLCtx *ctx )
+                modeHeight= ctx->modeInfo->vdisplay;
+                gfxWidth= ctx->nwFirst ? ctx->nwFirst->width : modeWidth;
+                gfxHeight= ctx->nwFirst ? ctx->nwFirst->height : modeWidth;
+-
++#if 0
+                if ( dw > gfxWidth )
+                {
+                   int cropw= dw-gfxWidth;
+@@ -5143,7 +5143,7 @@ static void wstSwapDRMBuffersAtomic( WstGLCtx *ctx )
+                   sh -= croph*frameHeight/rectH;
+                   dh= gfxHeight;
+                }
+-
++#endif
+                if ( (gfxWidth != modeWidth) || (gfxHeight != modeHeight) )
+                {
+                   dx= dx*modeWidth/gfxWidth;
+-- 
+2.31.0
+

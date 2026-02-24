@@ -1,0 +1,7 @@
+config BR2_PACKAGE_AML_AMAUDIOUTILS
+        bool "aml_amaudioutils"
+        select BR2_PACKAGE_AML_COMMONLIB
+        select BR2_PACKAGE_LIBLOG
+        select BR2_PACKAGE_BOOST
+        help
+          Audio HAL utilities

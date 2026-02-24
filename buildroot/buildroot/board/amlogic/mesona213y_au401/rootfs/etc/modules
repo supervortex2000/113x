@@ -1,0 +1,9 @@
+mali
+
+# media modules
+media_clock
+firmware
+video_framerate_adapter
+decoder_common
+amvdec_mh264
+

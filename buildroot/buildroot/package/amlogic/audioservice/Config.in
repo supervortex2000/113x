@@ -1,0 +1,180 @@
+menuconfig BR2_PACKAGE_AUDIOSERVICE
+	bool  "aml audioservice"
+	select  BR2_PACKAGE_DBUS
+	select  BR2_PACKAGE_DBUS_GLIB
+	select  BR2_PACKAGE_CJSON
+	select  BR2_PACKAGE_RSYSLOG
+	select  BR2_PACKAGE_AML_COMMONLIB
+        help
+		demo app to show
+
+if BR2_PACKAGE_AUDIOSERVICE
+
+config BR2_PACKAGE_AUDIOSERVICE_PULSEAUDIO
+	bool  "Enable audioservice with PulseAudio"
+	select  BR2_PACKAGE_PULSEAUDIO
+	select  BR2_PACKAGE_PULSEAUDIO_DAEMON
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_HALAUDIO
+	bool  "Enable audioservice with HalAudio"
+	select  BR2_PACKAGE_AML_HALAUDIO
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_FFMPEG
+	bool  "Enable audioservice with ffmpeg"
+	select  BR2_PACKAGE_FFMPEG_AML
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_RESAMPLE
+	bool  "Enable audioservice with Resample"
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_ASR
+	bool  "Enable audioservice client asr uartcmd"
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_PYTHON
+	bool  "Enable audioservice python client"
+	select  BR2_PACKAGE_DBUS_PYTHON
+	select  BR2_PACKAGE_PYTHON_PYEXPAT
+	select  BR2_PACKAGE_PYTHON
+	select  BR2_PACKAGE_PYTHON_GOBJECT
+  default n
+
+config BR2_PACKAGE_AUDIOSERVICE_S400_SBR
+	bool  "Amlogic SoundBar Refernece platform"
+	default n
+	help
+	  It's for dynamic control MCLK and SCLK.
+
+config BR2_PACKAGE_AUDIOSERVICE_S410_SBR
+	bool  "S410 SoundBar Refernece platform"
+	default n
+	help
+	  It's for dynamic control MCLK and SCLK.
+
+config BR2_PACKAGE_AUDIOSERVICE_AV400_SBR
+	bool  "Amlogic SoundBar Refernece platform"
+	default n
+	help
+	  It's for dynamic control MCLK and SCLK.
+
+config BR2_PACKAGE_AUDIOSERVICE_AB311_SBR
+	bool  "Amlogic SoundBar Refernece platform"
+	default n
+	help
+	  It's for dynamic control MCLK and SCLK.
+
+config BR2_PACKAGE_AUDIOSERVICE_CONFIG_FILE
+	string "set the audioservice configuration file"
+	default "default_audioservice_s400_sb.conf"
+	help
+		It selects which default_audioservice.conf
+
+config BR2_PACKAGE_AUDIOSERVICE_EXTERNAL_M6350
+	bool "Enable external M6350 device"
+	default n
+	help
+		Enable external input handle m6350
+
+config BR2_PACKAGE_AUDIOSERVICE_EXTERNAL_962E
+	bool "Enable 962E device"
+	default n
+	help
+		Enable 962E
+config BR2_PACKAGE_AUDIOSERVICE_EXTERNAL_M031
+	bool "Enable external M031 device"
+	default n
+	help
+		Enable external input handle mcu031
+config BR2_PACKAGE_AUDIOSERVICE_EXTERNAL_ADV7674
+	bool "Enable external ADV7674 device"
+	default n
+	help
+		Enable external input handle ADV7674
+
+config BR2_PACKAGE_AUDIOSERVICE_STRESSTEST
+	bool "Enable stress test"
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_USBPLAYER
+	bool  "Enable usb Player in homeapp"
+	select BR2_PACKAGE_FFMPEG_AML
+	select  BR2_PACKAGE_AML_AUDIO_PLAYER
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_AIRPLAY
+	bool  "Enable airplay client in homeapp"
+	select BR2_PACKAGE_AIRPLAY2
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_CAST_LITE
+	bool  "Enable cast lite client in homeapp"
+	select BR2_PACKAGE_CAST_LITE
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_LINE_IN_LOCAL
+	bool  "Enable line in local in homeapp"
+	default n
+
+config BR2_PACKAGE_AUDIOSERVICE_AMLUART
+	bool  "Enable AMLUART client in homeapp"
+	default n
+
+config BR2_PACKAGE_DOLBY_ATMOS_VERSION_1_7
+    bool "dolby atmos version v1.7"
+    default n
+    select BR2_PACKAGE_DOLBY_ATMOS_RELEASE
+    help
+        dolby atmos version v1.7
+
+config BR2_PACKAGE_AUDIOSERVICE_DISPLAY_LED_ENABLE
+    bool "Enable display led"
+    default n
+    help
+		Enable display led
+
+config BR2_PACKAGE_AUDIOSERVICE_DISPLAY_LCD_ENABLE
+    bool "Enable display lcd"
+    default n
+    help
+		Enable display lcd
+
+config BR2_PACKAGE_AUDIOSERVICE_DISPLAY_SPEAK_ENABLE
+    bool "Enable display speak"
+    default n
+    help
+		Enable display speak
+
+config BR2_PACKAGE_AUDIOSERVICE_INPUT_VAD_ENABLE
+    bool "Enable input vad"
+    default n
+    help
+		Enable input vad
+
+config BR2_PACKAGE_AUDIOSERVICE_KEY_BLE_CONFIG_ENABLE
+    bool "Enable key bt config"
+    default n
+    help
+		Enable key ble config
+
+config BR2_PACKAGE_AUDIOSERVICE_INPUT_BT_ENABLE
+    bool "Enable input bt"
+    default n
+    help
+		Enable input bt
+
+config BR2_PACKAGE_AUDIOSERVICE_HAL_HDMI_CEC_ENABLE
+    bool "Enable hal hdmi cec"
+    default n
+    help
+		Enable hal hdmi cec
+
+config BR2_PACKAGE_AUDIOSERVICE_HOMEAPP_CONFIG_FILE
+	string "set the homeapp configuration file"
+	help
+		It selects which default_homeapp.conf
+
+endif
+

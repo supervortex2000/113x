@@ -1,0 +1,35 @@
+diff --git a/DIALServer/DIALServer.cpp b/DIALServer/DIALServer.cpp
+index a1ddb2c..f5bd8a5 100644
+--- a/DIALServer/DIALServer.cpp
++++ b/DIALServer/DIALServer.cpp
+@@ -727,29 +727,7 @@ namespace Plugin {
+                         result->Body(textBody);
+                         TRACE(Protocol, (static_cast<const string&>(*textBody)));
+                     } else if (request.Verb == Web::Request::HTTP_POST) {
+-                        std::regex youtuberx("https://(.*)youtube.com(.*)");
+-                        std::regex youtuapprx("package:(.*)");
+-                        std::regex youtuapprx2("(.*)package:(\\s*)com.google.(.*).youtube");
+-                        bool bmatchyoutube =false;
+-                        if (request.Origin.IsSet())
+-                        {
+-                            bmatchyoutube = std::regex_match(request.Origin.Value().begin(),request.Origin.Value().end(), youtuberx);
+-                            bmatchyoutube |= std::regex_match(request.Origin.Value().begin(),request.Origin.Value().end(), youtuapprx);
+-                            bmatchyoutube |= std::regex_match(request.Origin.Value().begin(),request.Origin.Value().end(), youtuapprx2);
+-                            if (bmatchyoutube)
+-                            {
+-                                StartApplication(request, result, selectedApp->second);
+-                            }
+-                            else
+-                            {
+-                                result->ErrorCode = Web::STATUS_FORBIDDEN;
+-                                result->Message = string(_T("Unknown request path specified."));
+-                            }
+-                        }else
+-                        {
+-                            result->ErrorCode = Web::STATUS_FORBIDDEN;
+-                            result->Message = string(_T("Unknown request path specified."));
+-                        }
++                        StartApplication(request, result, selectedApp->second);
+                     }
+                     else if (request.Verb == Web::Request::HTTP_DELETE) {
+                         StopApplication(request, result, selectedApp->second);

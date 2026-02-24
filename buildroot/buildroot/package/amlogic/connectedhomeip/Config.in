@@ -1,0 +1,5 @@
+menuconfig BR2_PACKAGE_CONNECTEDHOMEIP
+	bool  "Amlogic Matter"
+    help
+	  It`s for Matter
+

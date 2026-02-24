@@ -1,0 +1,30 @@
+From 36e33e122b3d1b8929ee9b63f9706e5aab9cc981 Mon Sep 17 00:00:00 2001
+From: Arun P Madhavan <arun_madhavan@comcast.com>
+Date: Tue, 26 May 2020 13:22:21 +0000
+Subject: [PATCH 2/2] fix-compositor-size-renderer
+
+---
+ Compositor/Compositor.config | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/Compositor/Compositor.config b/Compositor/Compositor.config
+index 5596835..fabf00f 100644
+--- a/Compositor/Compositor.config
++++ b/Compositor/Compositor.config
+@@ -42,10 +42,11 @@ map()
+ 
+     if (${PLUGIN_COMPOSITOR_IMPLEMENTATION} STREQUAL "Wayland")
+         kv(display "wayland-0")
+-        kv(renderer "/usr/lib/libwesteros_render_gl.so")
++        kv(renderer "/usr/lib/libwesteros_render_gl.so.0.0.0")
+         kv(glname "libwesteros_gl.so.0.0.0")
+         kv(workdir "/tmp/wayland")
+-
++        kv(width "1920")
++        kv(height "1080")
+     endif ()
+ 
+     if (${PLUGIN_COMPOSITOR_IMPLEMENTATION} STREQUAL "Nexus")
+-- 
+2.24.0
+

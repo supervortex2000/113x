@@ -1,0 +1,19 @@
+config BR2_PACKAGE_AML_PQSERVER
+    bool "aml_pqserver"
+    help
+      amlogic pq library and bin.
+
+      http://openlinux.amlogic.com
+
+if BR2_PACKAGE_AML_PQSERVER
+
+config BR2_PACKAGE_AML_PQSERVER_USE_LIBBINDER
+    bool "aml_pqserver_use_binder"
+    default n
+    select BR2_PACKAGE_LIBBINDER
+    select BR2_PACKAGE_LIBLOG
+    help
+       This option will define TV_IPC_TYPE to TV_BINDER
+       or TV_DBUS, which will define in the mk.
+
+endif

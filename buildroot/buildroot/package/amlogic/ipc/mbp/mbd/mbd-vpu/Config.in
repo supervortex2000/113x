@@ -1,0 +1,6 @@
+config BR2_PACKAGE_MBD_VPU
+	bool "mbd vpu"
+	depends on BR2_PACKAGE_LINUX_OSAL
+	depends on BR2_PACKAGE_MBD_BASE
+	help
+		ipc mbd vpu driver

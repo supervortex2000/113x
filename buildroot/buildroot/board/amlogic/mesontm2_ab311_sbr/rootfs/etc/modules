@@ -1,0 +1,17 @@
+cfg80211
+mac80211
+mali
+dwc3
+aml_thermal
+dwc_otg
+
+# media modules
+media_clock
+firmware
+video_framerate_adapter
+decoder_common
+stream_input
+
+#optee
+optee
+optee_armtz

@@ -1,0 +1,20 @@
+#!/bin/sh
+#Mount things needed by this script
+/bin/mount -t sysfs sysfs /sys
+/bin/mount -t devtmpfs devtmpfs /dev
+/bin/mount -t proc proc /proc
+
+#Create device nodes
+mdev -s
+
+if [ -f /amlogic/modules/ramdisk/ramdisk_install.sh ]; then
+    cd /amlogic/modules/ramdisk/
+    /amlogic/modules/ramdisk/ramdisk_install.sh
+    cd -
+fi
+
+#This will only be run if the exec above failed
+echo "Failed to switch root, dropping to a shell"
+exec /sbin/init
+
+

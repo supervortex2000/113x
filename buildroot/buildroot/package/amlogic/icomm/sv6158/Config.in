@@ -1,0 +1,34 @@
+config BR2_PACKAGE_SV6158
+	bool "sv6158"
+	depends on BR2_LINUX_KERNEL
+	help
+	  sv6158 driver
+
+config BR2_PACKAGE_SV6158_GIT_VERSION
+	string "sv6158 git branch"
+	depends on BR2_PACKAGE_SV6158
+	help
+		git branch for sv6158
+
+config BR2_PACKAGE_SV6158_GIT_REPO_URL
+	string "sv6158 git URL"
+	depends on BR2_PACKAGE_SV6158
+	help
+		sv6158 git URL
+
+config BR2_PACKAGE_SV6158_LOCAL
+	bool "sv6158 local"
+	help
+		build sv6158 from local source code
+
+config BR2_PACKAGE_SV6158_LOCAL_PATH
+	string "sv6158 local path"
+	depends on BR2_PACKAGE_SV6158_LOCAL
+	help
+		sv6158 local source path
+
+config BR2_PACKAGE_SV6158_STANDALONE
+	bool "standalone kernel module"
+	depends on BR2_PACKAGE_SV6158
+	help
+	  compile ko directly

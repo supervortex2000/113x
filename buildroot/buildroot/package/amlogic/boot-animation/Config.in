@@ -1,0 +1,9 @@
+config BR2_PACKAGE_BOOT_ANIMATION
+    bool "boot-animation"
+    select BR2_PACKAGE_GST1_PLUGINS_BAD_PLUGIN_VIDEOPARSERS
+    select BR2_PACKAGE_GST1_PLUGINS_BASE_PLUGIN_VIDEOCONVERT
+    select BR2_PACKAGE_GST1_PLUGINS_BASE_PLUGIN_VIDEOSCALE
+    depends on BR2_PACKAGE_GSTREAMER1 && BR2_PACKAGE_GST1_PLUGINS_TSPLAYER && BR2_PACKAGE_GST1_LIBAV
+    help
+      boot animation!
+      see http://www.amlogic.com for more on this software

@@ -1,0 +1,8 @@
+#----------------------------------------------------------#
+#include "arch_a32_10.3.config"
+
+#----------------------------------------------------------#
+#include "c3_aw401.config"
+#include "flash_nand_2k.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesonc3_aw401/initramfs/ramfslist-32-ubi-release"
+

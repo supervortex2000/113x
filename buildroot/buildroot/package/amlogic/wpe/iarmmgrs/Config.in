@@ -1,0 +1,14 @@
+menuconfig BR2_PACKAGE_IARMMGRS
+	bool "iarmmgrs"
+	select BR2_PACKAGE_IARMMGRS_HAL_LLAMA
+	select BR2_PACKAGE_IARMBUS
+	select BR2_PACKAGE_HDMICEC
+	select BR2_PACKAGE_RFC
+	select BR2_PACKAGE_YAJL
+	select BR2_PACKAGE_WDMP_C
+	select BR2_PACKAGE_LIBDRM
+	select BR2_PACKAGE_AML_SYSTEMD 
+
+	help
+	   rdk iarmmgrs
+

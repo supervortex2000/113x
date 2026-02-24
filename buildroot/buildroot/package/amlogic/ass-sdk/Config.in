@@ -1,0 +1,14 @@
+config BR2_PACKAGE_ASS_SDK
+	bool "ass-sdk"
+	select BR2_PACKAGE_NODEJS_ARCH_SUPPORTS
+	select BR2_PACKAGE_NODEJS
+	select BR2_PACKAGE_NODEJS_NPM
+#       select BR2_PACKAGE_NODEJS_MODULES_ADDITIONAL
+#       select BR2_PACKAGE_NODEJS_MODULES_ADDITIONAL_DEPS
+	select BR2_PACKAGE_WEBSOCKETPP
+	select BR2_PACKAGE_APL_CLIENT_LIBRARY
+	select BR2_PACKAGE_APL_CORE_LIBRARY
+	help
+		The Alexa Smart Screen SDK extends the AVS Device SDK to support development for screen-based Alexa Built-in products. The Smart Screen SDK enables device makers to build screen-based products that complement Alexa voice responses with rich visual experiences.
+
+		https://developer.amazon.com/en-US/docs/alexa/alexa-smart-screen-sdk/overview.html

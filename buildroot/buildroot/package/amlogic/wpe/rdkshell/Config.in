@@ -1,0 +1,6 @@
+menuconfig BR2_PACKAGE_RDKSHELL
+	depends on BR2_PACKAGE_WESTEROS
+	bool "rdkshell"
+	help
+	   rdk shell.
+

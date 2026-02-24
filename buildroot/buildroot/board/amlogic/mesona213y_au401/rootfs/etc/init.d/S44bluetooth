@@ -1,0 +1,211 @@
+#!/bin/sh
+
+configure_file="/etc/bluetooth/main.conf"
+configure_bkp_file="/etc/bluetooth/main_bkp.conf"
+
+function get_device_from_conf()
+{
+	if [ -f $configure_file ];then
+		str=`grep -Insr "Device=" $configure_file`
+		if [ ! $str = "" ];then
+			device=`echo $str | awk -F = '{print $2}'`
+		else
+			echo No device defined in confirue file
+		fi
+	else
+		echo "No configure file"
+	fi
+}
+
+function set_btname()
+{
+	name_file=/etc/wifi/ap_name
+	local cnt=1
+	bt_name="amlogic"
+	while [ $cnt -lt 10 ]
+	do
+		if [ -f $name_file ];then
+			bt_name=`cat /etc/wifi/ap_name`
+			if [ "$bt_name" != "" ];then
+				break
+			fi
+		else
+			cnt=$((cnt + 1))
+			sleep 1
+		fi
+	done
+
+	if [ -f $configure_file ];then
+		sed -i -e "/Name/aName=MusicBox-$bt_name" -e "/Name/d" $configure_file
+	else
+		echo "create configure file"
+		echo "Name=MusicBox-$bt_name" > $configure_file
+		echo "debug=0"
+	fi
+
+}
+
+function set_service()
+{
+	service_cfgfile=/etc/init.d/bluealsa_profilecfg.sh
+
+	if [ $mode = "ble" ];then
+		BLE_SERVICE
+	elif [ -f $service_cfgfile ];then
+		/etc/init.d/bluealsa_profilecfg.sh $1 $mode
+	fi
+}
+
+rtk_bdaddr=/opt/bdaddr
+aml_bdaddr=/sys/module/kernel/parameters/btmac
+
+aml_bt_init()
+{
+	modprobe sdio_bt
+	usleep 200000
+	hciattach -s 115200 /dev/ttyS2 aml &> /dev/null
+	usleep 100000
+}
+
+realtek_bt_init()
+{
+	if [[ x$(cat $aml_bdaddr) != x && x$(cat $aml_bdaddr) != x"(null)" ]];then
+		cat $aml_bdaddr > $rtk_bdaddr
+	else
+		rm -f $rtk_bdaddr
+	fi
+	modprobe rtk_btuart
+	modprobe rtk_btusb
+	usleep 500000
+	rtk_hciattach -n -s 115200 /dev/ttyS2 rtk_h5 &
+}
+
+qca_bt_init()
+{
+	modprobe hci_uart
+	usleep 300000
+	hciattach -s 115200 /dev/ttyS2 qca 2> /dev/null
+}
+
+
+BLE_SERVICE()
+{
+	echo "|--bluez ble service--|"
+	hciconfig hci0 up
+	hciconfig hci0 noscan
+	sleep 1
+	btgatt-server &
+}
+
+Blue_start()
+{
+	echo "|--bluez: device = $device mode = $mode--|"
+	echo 0 > /sys/class/rfkill/rfkill0/state
+	usleep 500000
+	echo 1 > /sys/class/rfkill/rfkill0/state
+
+	echo
+	echo "|-----start bluez----|"
+	set_btname
+
+	if [ $device = "aml" ];then
+		aml_bt_init
+	elif [ $device = "rtk" ];then
+		realtek_bt_init
+	elif [ $device = "qca" ];then
+		qca_bt_init
+	else
+		modprobe hci_uart
+		usleep 300000
+		hciattach -s 115200 /dev/ttyS2 any
+	fi
+	local cnt=10
+	while [ $cnt -gt 0 ]; do
+		hciconfig hci0 2> /dev/null
+		if [ $? -eq 1 ];then
+			echo "checking hci0 ......."
+			sleep 1
+			cnt=$((cnt - 1))
+		else
+			break
+		fi
+	done
+
+	if [ $cnt -eq 0 ];then
+		echo "hci0 bring up failed!!!"
+		exit 0
+	fi
+
+	grep -Insr "debug=1" $configure_file > /dev/null
+	if [ $? -eq 0 ]; then
+		hcidump -w /etc/bluetooth/btsnoop.cfa &
+	fi
+
+	set_service start $mode
+
+	echo "|-----bluez is ready----|"
+
+}
+
+Blue_stop()
+{
+	echo -n "Stopping bluez"
+	killall btgatt-server
+	set_service stop
+	killall hcidump
+	hciconfig hci0 down
+	killall rtk_hciattach
+	killall hciattach
+	rmmod sdio_bt
+	rmmod hci_uart
+	rmmod rtk_btusb
+	sleep 2
+	echo 0 > /sys/class/rfkill/rfkill0/state
+	echo
+	echo "|-----bluez is shutdown-----|"
+}
+
+if [ ! -s $configure_file ];then
+	cp $configure_bkp_file $configure_file -f
+fi
+
+if [ $2 ];then
+	mode=$2
+else
+	mode="sink"
+fi
+
+if [ $3 ];then
+	device=$3
+else
+	get_device_from_conf
+fi
+
+case "$1" in
+	start)
+		Blue_start &
+		;;
+	restart)
+		Blue_stop
+		Blue_start &
+		;;
+	up)
+		set_service start $mode
+		;;
+	down)
+		set_service stop
+		;;
+	reset)
+		set_service stop
+		set_service start $mode
+		;;
+	stop)
+		Blue_stop
+		;;
+	*)
+		echo "Usage: $0 {start|stop}"
+		exit 1
+esac
+
+exit $?
+

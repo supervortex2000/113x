@@ -1,0 +1,404 @@
+From 85e4448fd8e4c345ecc2b67ae529bb1ecc94db1d Mon Sep 17 00:00:00 2001
+From: Song Zhao <song.zhao@amlogic.com>
+Date: Tue, 7 Apr 2020 16:07:14 -0700
+Subject: [PATCH] add secmemallocator
+
+---
+ Source/WebCore/platform/GStreamer.cmake       |   8 +
+ ...bKitCommonEncryptionDecryptorGStreamer.cpp | 235 ++++++++++++++++++
+ ...WebKitCommonEncryptionDecryptorGStreamer.h |   1 +
+ .../eme/WebKitOpenCDMDecryptorGStreamer.cpp   |   4 +-
+ Source/cmake/FindGstSecmemAllocator.cmake     |   9 +
+ Source/cmake/GStreamerChecks.cmake            |   4 +
+ 6 files changed, 260 insertions(+), 1 deletion(-)
+ create mode 100644 Source/cmake/FindGstSecmemAllocator.cmake
+
+Index: git/Source/WebCore/platform/GStreamer.cmake
+===================================================================
+--- git.orig/Source/WebCore/platform/GStreamer.cmake
++++ git/Source/WebCore/platform/GStreamer.cmake
+@@ -160,6 +160,14 @@ if (ENABLE_ENCRYPTED_MEDIA)
+             platform/graphics/gstreamer/eme/WebKitClearKeyDecryptorGStreamer.cpp
+         )
+     endif ()
++    if (ENABLE_SECMEM)
++        list(APPEND WebCore_SYSTEM_INCLUDE_DIRECTORIES
++            ${GSTSECMEMALLOCATOR_INCLUDE_DIRS}
++        )
++        list(APPEND WebCore_LIBRARIES
++            ${GSTSECMEMALLOCATOR_LIBRARIES}
++        )
++    endif ()
+ endif ()
+ 
+ if (USE_HOLE_PUNCH_EXTERNAL)
+Index: git/Source/WebCore/platform/graphics/gstreamer/eme/WebKitCommonEncryptionDecryptorGStreamer.cpp
+===================================================================
+--- git.orig/Source/WebCore/platform/graphics/gstreamer/eme/WebKitCommonEncryptionDecryptorGStreamer.cpp
++++ git/Source/WebCore/platform/graphics/gstreamer/eme/WebKitCommonEncryptionDecryptorGStreamer.cpp
+@@ -25,6 +25,7 @@
+ 
+ #if ENABLE(ENCRYPTED_MEDIA) && USE(GSTREAMER)
+ 
++#define SECMEM 1
+ #include "GStreamerEMEUtilities.h"
+ #include "SharedBuffer.h"
+ #include <CDMInstance.h>
+@@ -32,6 +33,7 @@
+ #include <wtf/PrintStream.h>
+ #include <wtf/RunLoop.h>
+ #include <wtf/text/StringHash.h>
++#include <gstsecmemallocator.h>
+ 
+ using WebCore::CDMInstance;
+ 
+@@ -46,12 +48,17 @@ struct _WebKitMediaCommonEncryptionDecry
+     Vector<GRefPtr<GstEvent>> m_protectionEvents;
+     uint32_t m_currentEvent { 0 };
+     bool m_isFlushing { false };
++    bool inPlace;
+ };
+ 
+ static GstStateChangeReturn webKitMediaCommonEncryptionDecryptorChangeState(GstElement*, GstStateChange transition);
+ static void webKitMediaCommonEncryptionDecryptorSetContext(GstElement*, GstContext*);
+ static void webKitMediaCommonEncryptionDecryptorFinalize(GObject*);
+ static GstCaps* webkitMediaCommonEncryptionDecryptTransformCaps(GstBaseTransform*, GstPadDirection, GstCaps*, GstCaps*);
++#if SECMEM
++static GstFlowReturn webkitMediaCommonEncryptionDecryptPrepareOutputBuffer(GstBaseTransform*, GstBuffer*, GstBuffer**);
++static GstFlowReturn webkitMediaCommonEncryptionDecryptTransform(GstBaseTransform*, GstBuffer*, GstBuffer*);
++#endif
+ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseTransform*, GstBuffer*);
+ static gboolean webkitMediaCommonEncryptionDecryptSinkEventHandler(GstBaseTransform*, GstEvent*);
+ static void webkitMediaCommonEncryptionDecryptProcessProtectionEvents(WebKitMediaCommonEncryptionDecrypt*, Ref<WebCore::SharedBuffer>&&);
+@@ -76,6 +83,10 @@ static void webkit_media_common_encrypti
+     elementClass->set_context = GST_DEBUG_FUNCPTR(webKitMediaCommonEncryptionDecryptorSetContext);
+ 
+     GstBaseTransformClass* baseTransformClass = GST_BASE_TRANSFORM_CLASS(klass);
++#if SECMEM
++    baseTransformClass->prepare_output_buffer = GST_DEBUG_FUNCPTR(webkitMediaCommonEncryptionDecryptPrepareOutputBuffer);
++    baseTransformClass->transform = GST_DEBUG_FUNCPTR(webkitMediaCommonEncryptionDecryptTransform);
++#endif
+     baseTransformClass->transform_ip = GST_DEBUG_FUNCPTR(webkitMediaCommonEncryptionDecryptTransformInPlace);
+     baseTransformClass->transform_caps = GST_DEBUG_FUNCPTR(webkitMediaCommonEncryptionDecryptTransformCaps);
+     baseTransformClass->transform_ip_on_passthrough = FALSE;
+@@ -100,6 +111,8 @@ static void webkit_media_common_encrypti
+     gst_base_transform_set_in_place(base, TRUE);
+     gst_base_transform_set_passthrough(base, FALSE);
+     gst_base_transform_set_gap_aware(base, FALSE);
++    priv->inPlace = TRUE;
++    self->allocator = NULL;
+ }
+ 
+ static void webKitMediaCommonEncryptionDecryptorFinalize(GObject* object)
+@@ -108,9 +121,66 @@ static void webKitMediaCommonEncryptionD
+     WebKitMediaCommonEncryptionDecryptPrivate* priv = self->priv;
+ 
+     priv->~WebKitMediaCommonEncryptionDecryptPrivate();
++#if SECMEM
++    if (self->allocator) {
++        gst_object_unref(self->allocator);
++    }
++#endif
+     GST_CALL_PARENT(G_OBJECT_CLASS, finalize, (object));
+ }
+ 
++#if SECMEM
++static GstFlowReturn webkitMediaCommonEncryptionDecryptFillOutputBuffer(GstBaseTransform* base, GstBuffer *inbuf, GstBuffer *outbuf)
++{
++    WebKitMediaCommonEncryptionDecrypt* self = WEBKIT_MEDIA_CENC_DECRYPT(base);
++    GstMemory *mem;
++    GstMapInfo info;
++    gboolean ret;
++    if (self->allocator) {
++        mem = gst_buffer_peek_memory(outbuf, 0);
++        g_return_val_if_fail(gst_is_secmem_memory(mem), GST_FLOW_ERROR);
++        gst_buffer_map(inbuf, &info, GST_MAP_READ);
++        ret = gst_secmem_fill(mem, 0, info.data, info.size);
++        gst_buffer_unmap(inbuf, &info);
++        g_return_val_if_fail(ret == TRUE, GST_FLOW_ERROR);
++    }
++    return GST_FLOW_OK;
++
++}
++
++static GstFlowReturn webkitMediaCommonEncryptionDecryptPrepareOutputBuffer(GstBaseTransform* base, GstBuffer *inbuf, GstBuffer **outbuf)
++{
++
++    WebKitMediaCommonEncryptionDecrypt* self = WEBKIT_MEDIA_CENC_DECRYPT(base);
++
++    if (self->allocator) {
++        *outbuf = gst_buffer_new_allocate(self->allocator, gst_buffer_get_size(inbuf), NULL);
++        g_return_val_if_fail(*outbuf != NULL, GST_FLOW_ERROR);
++        GstProtectionMeta* protectionMeta = reinterpret_cast<GstProtectionMeta*>(gst_buffer_get_protection_meta(inbuf));
++        if (protectionMeta) {
++            GstMemory *mem = gst_buffer_peek_memory(*outbuf, 0);
++            g_return_val_if_fail(gst_is_secmem_memory(mem), GST_FLOW_ERROR);
++
++            secmem_handle_t handle = gst_secmem_memory_get_handle(mem);
++
++            gst_structure_set(protectionMeta->info,
++                        "handle", G_TYPE_INT, handle,
++                        NULL);
++        }
++        GST_BASE_TRANSFORM_CLASS(parent_class)->copy_metadata (base, inbuf, *outbuf);
++    } else {
++        if (gst_buffer_is_writable (inbuf)) {
++            *outbuf = inbuf;
++            GST_LOG_OBJECT(base, "reuse inbuf %p", inbuf);
++        } else {
++            *outbuf = gst_buffer_copy (inbuf);
++            GST_LOG_OBJECT(base, "copy inbuf %p", *outbuf);
++        }
++    }
++    return GST_FLOW_OK;
++}
++#endif
++
+ static GstCaps* webkitMediaCommonEncryptionDecryptTransformCaps(GstBaseTransform* base, GstPadDirection direction, GstCaps* caps, GstCaps* filter)
+ {
+     if (direction == GST_PAD_UNKNOWN)
+@@ -120,6 +190,7 @@ static GstCaps* webkitMediaCommonEncrypt
+ 
+     GstCaps* transformedCaps = gst_caps_new_empty();
+     WebKitMediaCommonEncryptionDecrypt* self = WEBKIT_MEDIA_CENC_DECRYPT(base);
++    WebKitMediaCommonEncryptionDecryptPrivate* priv = self->priv;
+ 
+     unsigned size = gst_caps_get_size(caps);
+     for (unsigned i = 0; i < size; ++i) {
+@@ -194,6 +265,35 @@ static GstCaps* webkitMediaCommonEncrypt
+             gst_caps_append_structure(transformedCaps, outgoingStructure.release());
+     }
+ 
++#if SECMEM
++    if (direction == GST_PAD_SINK) {
++        gboolean secure_video = false;
++        gboolean is_vp9 = false;
++        gint height = 0;
++        size = gst_caps_get_size(transformedCaps);
++        for (unsigned i = 0; i < size; ++i) {
++            GstStructure *structure;
++            structure = gst_caps_get_structure(transformedCaps, i);
++            if (g_str_has_prefix (gst_structure_get_name (structure), "video/")) {
++                secure_video = true;
++                gst_caps_set_features(transformedCaps, i, gst_caps_features_from_string (GST_CAPS_FEATURE_MEMORY_SECMEM_MEMORY));
++                if (g_str_has_prefix (gst_structure_get_name (structure), "video/x-vp9")) {
++                    is_vp9 = true;
++                }
++            }
++        }
++        if (secure_video && !self->allocator) {
++            self->allocator = gst_secmem_allocator_new(false, is_vp9);
++        }
++        if (secure_video && priv->inPlace) {
++            GstBaseTransform* base = GST_BASE_TRANSFORM(self);
++
++            gst_base_transform_set_in_place(base, FALSE);
++            priv->inPlace = FALSE;
++        }
++    }
++#endif
++
+     if (filter) {
+         GstCaps* intersection;
+ 
+@@ -207,6 +307,144 @@ static GstCaps* webkitMediaCommonEncrypt
+     return transformedCaps;
+ }
+ 
++#if SECMEM
++static GstFlowReturn webkitMediaCommonEncryptionDecryptTransform(GstBaseTransform* base, GstBuffer* inbuf, GstBuffer* outbuf)
++{
++    WebKitMediaCommonEncryptionDecrypt* self = WEBKIT_MEDIA_CENC_DECRYPT(base);
++    WebKitMediaCommonEncryptionDecryptPrivate* priv = WEBKIT_MEDIA_CENC_DECRYPT_GET_PRIVATE(self);
++    GstProtectionMeta* protectionMeta = reinterpret_cast<GstProtectionMeta*>(gst_buffer_get_protection_meta(inbuf));
++    if (!protectionMeta) {
++
++        GST_TRACE_OBJECT(self, "buffer %p has no protection meta, assuming it's not encrypted", inbuf);
++        return webkitMediaCommonEncryptionDecryptFillOutputBuffer(base, inbuf, outbuf);
++    }
++
++    LockHolder locker(priv->m_mutex);
++    const GValue* streamEncryptionEventsList = gst_structure_get_value(protectionMeta->info, "stream-encryption-events");
++    if (streamEncryptionEventsList && GST_VALUE_HOLDS_LIST(streamEncryptionEventsList)) {
++        unsigned streamEncryptionEventsListSize = gst_value_list_get_size(streamEncryptionEventsList);
++        for (unsigned i = 0; i < streamEncryptionEventsListSize; ++i)
++            priv->m_protectionEvents.append(GRefPtr<GstEvent>(static_cast<GstEvent*>(g_value_get_boxed(gst_value_list_get_value(streamEncryptionEventsList, i)))));
++        gst_structure_remove_field(protectionMeta->info, "stream-encryption-events");
++        if (!gst_structure_n_fields(protectionMeta->info)) {
++            GST_ERROR_OBJECT(self, "buffer %p did not have enough protection meta-data", inbuf);
++            return GST_FLOW_NOT_SUPPORTED;
++        }
++    }
++
++    const GValue* value;
++    value = gst_structure_get_value(protectionMeta->info, "kid");
++    GstBuffer* keyIDBuffer = nullptr;
++    if (!value) {
++        GST_ERROR_OBJECT(self, "No key ID available for encrypted sample");
++        return GST_FLOW_NOT_SUPPORTED;
++    }
++
++    keyIDBuffer = gst_value_get_buffer(value);
++
++    if (!priv->m_protectionEvents.isEmpty()) {
++        GstMappedBuffer mappedKeyID(keyIDBuffer, GST_MAP_READ);
++        if (!mappedKeyID) {
++            GST_ERROR_OBJECT(self, "Failed to map key ID buffer");
++            return GST_FLOW_NOT_SUPPORTED;
++        }
++        auto keyId = WebCore::SharedBuffer::create(mappedKeyID.data(), mappedKeyID.size());
++        webkitMediaCommonEncryptionDecryptProcessProtectionEvents(self, WTFMove(keyId));
++    }
++
++    // The key might not have been received yet. Wait for it.
++    if (!priv->m_keyReceived) {
++        GST_DEBUG_OBJECT(self, "key not available yet, waiting for it");
++        if (GST_STATE(GST_ELEMENT(self)) < GST_STATE_PAUSED || (GST_STATE_TARGET(GST_ELEMENT(self)) != GST_STATE_VOID_PENDING && GST_STATE_TARGET(GST_ELEMENT(self)) < GST_STATE_PAUSED)) {
++            GST_ERROR_OBJECT(self, "can't process key requests in less than PAUSED state");
++            return GST_FLOW_NOT_SUPPORTED;
++        }
++        if (!priv->m_condition.waitFor(priv->m_mutex, WEBCORE_GSTREAMER_EME_LICENSE_KEY_RESPONSE_TIMEOUT, [priv] { return priv->m_isFlushing || priv->m_keyReceived; })) {
++            if (!priv->m_keyReceived) {
++                GST_ERROR_OBJECT(self, "key not available");
++                return GST_FLOW_NOT_SUPPORTED;
++            }
++        }
++
++        if (priv->m_isFlushing) {
++            GST_DEBUG_OBJECT(self, "flushing");
++            return GST_FLOW_FLUSHING;
++        }
++
++        GST_DEBUG_OBJECT(self, "key received, continuing");
++    }
++
++    unsigned ivSize;
++    if (!gst_structure_get_uint(protectionMeta->info, "iv_size", &ivSize)) {
++        GST_ERROR_OBJECT(self, "Failed to get iv_size");
++        return GST_FLOW_NOT_SUPPORTED;
++    }
++
++    gboolean encrypted;
++    if (!gst_structure_get_boolean(protectionMeta->info, "encrypted", &encrypted)) {
++        GST_ERROR_OBJECT(self, "Failed to get encrypted flag");
++        return GST_FLOW_NOT_SUPPORTED;
++    }
++
++    if (!ivSize || !encrypted) {
++        return webkitMediaCommonEncryptionDecryptFillOutputBuffer(base, inbuf, outbuf);
++    }
++
++    GST_TRACE_OBJECT(base, "protection meta: %" GST_PTR_FORMAT, protectionMeta->info);
++
++    unsigned subSampleCount;
++    if (!gst_structure_get_uint(protectionMeta->info, "subsample_count", &subSampleCount)) {
++        GST_ERROR_OBJECT(self, "Failed to get subsample_count");
++        return GST_FLOW_NOT_SUPPORTED;
++    }
++
++    GstBuffer* subSamplesBuffer = nullptr;
++    if (subSampleCount) {
++        value = gst_structure_get_value(protectionMeta->info, "subsamples");
++        if (!value) {
++            GST_ERROR_OBJECT(self, "Failed to get subsamples");
++            return GST_FLOW_NOT_SUPPORTED;
++        }
++        subSamplesBuffer = gst_value_get_buffer(value);
++    }
++
++#ifndef GST_DISABLE_GST_DEBUG
++    if (gst_debug_category_get_threshold(GST_CAT_DEFAULT) >= GST_LEVEL_MEMDUMP) {
++        GstMappedBuffer mappedKeyID(keyIDBuffer, GST_MAP_READ);
++        if (!mappedKeyID) {
++            GST_ERROR_OBJECT(self, "failed to map key ID buffer");
++            return GST_FLOW_NOT_SUPPORTED;
++        }
++        GST_MEMDUMP_OBJECT(self, "key ID for sample", mappedKeyID.data(), mappedKeyID.size());
++    }
++#endif
++
++    WebKitMediaCommonEncryptionDecryptClass* klass = WEBKIT_MEDIA_CENC_DECRYPT_GET_CLASS(self);
++    if (!klass->setupCipher(self, keyIDBuffer)) {
++        GST_ERROR_OBJECT(self, "Failed to configure cipher");
++        return GST_FLOW_NOT_SUPPORTED;
++    }
++
++    value = gst_structure_get_value(protectionMeta->info, "iv");
++    if (!value) {
++        GST_ERROR_OBJECT(self, "Failed to get IV for sample");
++        klass->releaseCipher(self);
++        return GST_FLOW_NOT_SUPPORTED;
++    }
++
++    GstBuffer* ivBuffer = gst_value_get_buffer(value);
++    GST_TRACE_OBJECT(self, "decrypting");
++    if (!klass->decrypt(self, keyIDBuffer, ivBuffer, inbuf, subSampleCount, subSamplesBuffer)) {
++        GST_ERROR_OBJECT(self, "Decryption failed inbuf:%p", inbuf);
++        klass->releaseCipher(self);
++        return GST_FLOW_NOT_SUPPORTED;
++    }
++
++    klass->releaseCipher(self);
++    return GST_FLOW_OK;
++}
++#endif
++
+ static GstFlowReturn webkitMediaCommonEncryptionDecryptTransformInPlace(GstBaseTransform* base, GstBuffer* buffer)
+ {
+     WebKitMediaCommonEncryptionDecrypt* self = WEBKIT_MEDIA_CENC_DECRYPT(base);
+Index: git/Source/WebCore/platform/graphics/gstreamer/eme/WebKitCommonEncryptionDecryptorGStreamer.h
+===================================================================
+--- git.orig/Source/WebCore/platform/graphics/gstreamer/eme/WebKitCommonEncryptionDecryptorGStreamer.h
++++ git/Source/WebCore/platform/graphics/gstreamer/eme/WebKitCommonEncryptionDecryptorGStreamer.h
+@@ -54,6 +54,7 @@ struct _WebKitMediaCommonEncryptionDecry
+     GstBaseTransform parent;
+ 
+     WebKitMediaCommonEncryptionDecryptPrivate* priv;
++    GstAllocator *allocator;
+ };
+ 
+ struct _WebKitMediaCommonEncryptionDecryptClass {
+Index: git/Source/WebCore/platform/graphics/gstreamer/eme/WebKitOpenCDMDecryptorGStreamer.cpp
+===================================================================
+--- git.orig/Source/WebCore/platform/graphics/gstreamer/eme/WebKitOpenCDMDecryptorGStreamer.cpp
++++ git/Source/WebCore/platform/graphics/gstreamer/eme/WebKitOpenCDMDecryptorGStreamer.cpp
+@@ -59,7 +59,9 @@ static GstStaticPadTemplate srcTemplate
+         "audio/mp4; "
+         "audio/mpeg; "
+         "video/x-h264; "
+-        "video/x-vp9; "));
++        "video/x-h264(memory:SecMem); "
++        "video/x-vp9; "
++        "video/x-vp9(memory:SecMem); "));
+ 
+ GST_DEBUG_CATEGORY(webkit_media_opencdm_decrypt_debug_category);
+ #define GST_CAT_DEFAULT webkit_media_opencdm_decrypt_debug_category
+Index: git/Source/cmake/FindGstSecmemAllocator.cmake
+===================================================================
+--- /dev/null
++++ git/Source/cmake/FindGstSecmemAllocator.cmake
+@@ -0,0 +1,9 @@
++find_path (GSTSECMEMALLOCATOR_INCLUDE_DIRS NAME gstsecmemallocator.h PATHS "usr/include/" )
++
++find_library(GSTSECMEMALLOCATOR_LIBRARIES NAME gstsecmemallocator PATH_SUFFIXES lib)
++
++include(FindPackageHandleStandardArgs)
++FIND_PACKAGE_HANDLE_STANDARD_ARGS(GSTSECMEMALLOCATOR DEFAULT_MSG GSTSECMEMALLOCATOR_INCLUDE_DIRS GSTSECMEMALLOCATOR_LIBRARIES)
++
++mark_as_advanced(GSTSECMEMALLOCATOR_INCLUDE_DIRS GSTSECMEMALLOCATOR_LIBRARIES)
++
+Index: git/Source/cmake/GStreamerChecks.cmake
+===================================================================
+--- git.orig/Source/cmake/GStreamerChecks.cmake
++++ git/Source/cmake/GStreamerChecks.cmake
+@@ -49,6 +49,10 @@ if (ENABLE_VIDEO OR ENABLE_WEB_AUDIO)
+         find_package(OpenCDM REQUIRED)
+         add_definitions(-DUSE_OPENCDM=1)
+       endif()
++      if (ENABLE_SECMEM)
++        find_package(GstSecmemAllocator REQUIRED)
++        add_definitions(-DUSE_SECMEM=1)
++      endif()
+     endif ()
+ 
+     SET_AND_EXPOSE_TO_BUILD(USE_GSTREAMER TRUE)

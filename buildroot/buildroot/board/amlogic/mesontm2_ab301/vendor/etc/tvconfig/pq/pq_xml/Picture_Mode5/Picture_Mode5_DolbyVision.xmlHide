@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Form name="Picture_Mode5_DolbyVision" platform="txlx" commands="">
+<Group num="0" val="0">
+<Page tab_title="" layout="10x4">
+<Control ui_type="" name="DolbyVision_Dark" value="22" Backlight="100" Brightness="50" Contrast="50" Saturation="50" Sharpness="50" Hue="50" ColorTemperature="2" RedGain="0" GreenGain="0" BlueGain="0" step="4" GammaMidLuminance="0" NR="0" MpegNR="0" DynamicContrast="0" LocalContrast="0" CmLevel="0" BlackExtension="0" DolbyMode="0"/>
+<Control ui_type="" name="DolbyVision_Bright" value="23" Backlight="100" Brightness="50" Contrast="50" Saturation="50" Sharpness="50" Hue="50" ColorTemperature="2" RedGain="0" GreenGain="0" BlueGain="0" step="4" GammaMidLuminance="0" NR="0" MpegNR="0" DynamicContrast="0" LocalContrast="0" CmLevel="0" BlackExtension="0" DolbyMode="1"/>
+</Page>                                                                                                                                                                                                                                                                                                                                                                         
+</Group>                                                                                                                                                                                                                                                                                                                                                                        
+</Form>
+

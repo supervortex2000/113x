@@ -1,0 +1,15 @@
+#----------------------------------------------------------#
+#include "arch_a32_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "t5_ak301_roku.config"
+
+#----------------------------------------------------------#
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesont5_ak301/initramfs/ramfslist-32-roku"
+BR2_ROOTFS_UPGRADE_DIR="board/amlogic/common/upgrade/upgrade-t5/"
+
+#BR2_PACKAGE_RTK8821CU=y
+#BR2_PACKAGE_RTK8821CU_LOCAL=y
+#BR2_PACKAGE_RTK8821CU_STANDALONE=y
+#BR2_PACKAGE_RTK8821CU_GIT_VERSION="buildroot"
+#BR2_PACKAGE_RTK8821CU_LOCAL_PATH="$(TOPDIR)/../hardware/aml-4.9/wifi/realtek/drivers/8821cu"

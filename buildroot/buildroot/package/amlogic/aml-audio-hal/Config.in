@@ -1,0 +1,31 @@
+config BR2_PACKAGE_AML_AUDIO_HAL
+        bool "aml_audio_hal"
+        select BR2_PACKAGE_AML_AMAUDIOUTILS
+        select BR2_PACKAGE_TINYALSA
+        select BR2_PACKAGE_ANDROID_TOOLS
+        select BR2_PACKAGE_EXPAT
+        depends on BR2_PACKAGE_MEDIAHAL_SDK_MEDIASYNC
+        help
+          Audio HAL ported from Android audio HAL stack
+
+config BR2_PACKAGE_AML_AUDIO_HAL_EQ_DRC
+        bool "enable_eq_drc"
+	depends on BR2_PACKAGE_AML_AUDIO_HAL
+	help
+	  Enable DQ/DRC in audio HAL
+
+config BR2_PACKAGE_AML_AUDIO_HAL_DVB
+        bool "enable_audio_dvb"
+	depends on BR2_PACKAGE_AML_AUDIO_HAL
+	select BR2_PACKAGE_AML_DVB
+	select BR2_PACKAGE_LIBPLAYER
+	help
+	  DVB audio tunnel support in audio HAL
+
+
+config BR2_PACKAGE_AML_AUDIO_HAL_MSYNC
+	bool "aml_audio_hal_msync"
+	depends on BR2_PACKAGE_AML_AUDIO_HAL
+	default y
+	help
+		Enable MSYNC

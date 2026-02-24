@@ -1,0 +1,456 @@
+From f6de33236855a05ef08e308ef799efe8200f2fc0 Mon Sep 17 00:00:00 2001
+From: "shu.wang" <shu.wang@amlogic.com>
+Date: Fri, 24 Jun 2022 14:21:45 +0800
+Subject: [PATCH] handfree: add command mode operation interface "hfp_ctl_cmd"
+ [1/1]
+
+PD#SWPL-83487
+
+Problem:
+1.No command mode operation interface
+2.Unable to get handfree status
+
+Solution:
+1.add command mode operation interface "hfp_ctl_cmd"
+2.Write the handfree state to file
+
+Verify:
+A113L-AD403
+
+Change-Id: I21487ead6ac55f220b9a8bd586a737efbdf7c564
+Signed-off-by: shu.wang <shu.wang@amlogic.com>
+---
+ utils/Makefile.am |   8 ++
+ utils/hfp_ctl.c   | 297 +++++++++++++++++++++++++++++++++++-----------
+ 2 files changed, 235 insertions(+), 70 deletions(-)
+
+diff --git a/utils/Makefile.am b/utils/Makefile.am
+index 4579538..9c4b25c 100644
+--- a/utils/Makefile.am
++++ b/utils/Makefile.am
+@@ -50,3 +50,11 @@ hfp_ctl_CFLAGS = -lpthread \
+ 	@ALSA_CFLAGS@
+ hfp_ctl_LDADD = \
+ 	@ALSA_LIBS@
++
++bin_PROGRAMS += hfp_ctl_cmd
++hfp_ctl_cmd_SOURCES = hfp_ctl.c \
++	../src/shared/log.c \
++	../src/shared/ctl-socket.c
++hfp_ctl_cmd_CFLAGS = -lpthread \
++	-I$(top_srcdir)/src \
++	-DCMD_HFP_CTL
+\ No newline at end of file
+diff --git a/utils/hfp_ctl.c b/utils/hfp_ctl.c
+index 9f114fd..9ec4294 100644
+--- a/utils/hfp_ctl.c
++++ b/utils/hfp_ctl.c
+@@ -7,7 +7,18 @@
+ #include "shared/ctl-socket.h"
+ #include "hfp_ctl.h"
+ #include "sco_handler.h"
++#include <sys/ipc.h>
++#include <sys/msg.h>
++#include <errno.h>
+ 
++#define MSGKEY 123
++#define MSGTYPE 1
++struct msgstru
++{
++	long msgtype;
++	char msgtext[32];
++};
++int msqid;
+ 
+ #define INFO(fmt, args...) \
+ 	printf("[HFP_CTL][%s] " fmt, __func__, ##args)
+@@ -42,22 +53,46 @@ static void *hfp_ctl_monitor(void *arg);
+ /* remote party being alerted in an outgoing call */
+ #define HFP_IND_CALLSETUP_OUT_ALERT 3
+ 
++#define HFP_STATE_FILE   "/tmp/hfp_state"
++#define HFP_STATE_DISCONNECT        0                  //未连接handfree
++#define HFP_STATE_CONNECT           1                  //已连接handfree
++#define HFP_STATE_CALL_IN           2                  //有呼入
++#define HFP_STATE_CALL_OUT          3                  //有呼出
++#define HFP_STATE_CALL_OUT_RINGING  4                  //呼出对方已振铃
++#define HFP_STATE_CALL_IN_OUT_OVER  5                  //呼入呼出结束
++#define HFP_STATE_CALL_START        6                  //接通通话
++#define HFP_STATE_CALL_ENDED        7                  //挂断通话
+ 
+ int hfp_ctl_init(void)
+ {
++#ifndef CMD_HFP_CTL
+ 	if (pthread_create(&phfp_ctl_id, NULL, hfp_ctl_monitor, NULL)) {
+ 		perror("hfp_ctl_client");
+ 		teardown_socket_client(hfp_ctl_sk);
+ 		return -1;
+ 	}
+ 	pthread_setname_np(phfp_ctl_id, "hfp_ctl_monitor");
+-
++#else
++	char retry = 3;
++init:
++	hfp_ctl_sk = setup_socket_client(CTL_SOCKET_PATH);
++	if (hfp_ctl_sk < 0) {
++		retry--;
++		if (retry <= 0) {
++			INFO("hfp can't connect to Server!\n");
++			return -1;
++		}
++		sleep(3);
++		goto init;
++	}
++#endif
+ 	INFO("Server is ready for connection...\n");
+ 	return 0;
+ }
+ 
+ void hfp_ctl_delinit(void)
+ {
++#ifndef CMD_HFP_CTL
+ 	/*set thread to cancel state, and free resouce
+ 	  thread will exit once teardown_socket_server()
+ 	  wakes thread up from recv()
+@@ -66,6 +101,7 @@ void hfp_ctl_delinit(void)
+ 	pthread_detach(phfp_ctl_id);
+ 
+ 	hfp_connected = 0;
++#endif
+ 	teardown_socket_client(hfp_ctl_sk);
+ }
+ 
+@@ -96,26 +132,30 @@ int reject_call(void)
+ 
+ int VGS_up(void)
+ {
+-	sVol += 1;
++	if (sVol < 15)
++		sVol += 1;
+ 	return set_VGS(sVol);
+ }
+ 
+ int VGS_down(void)
+ {
+-	sVol -= 1;
++	if (sVol > 0)
++		sVol -= 1;
+ 	return set_VGS(sVol);
+ 
+ }
+ 
+ int VGM_up(void)
+ {
+-	mVol += 1;
++	if (mVol < 15)
++		mVol += 1;
+ 	return set_VGM(mVol);
+ }
+ 
+ int VGM_down(void)
+ {
+-	mVol -= 1;
++	if (mVol > 0)
++		mVol -= 1;
+ 	return set_VGM(mVol);
+ 
+ }
+@@ -156,11 +196,99 @@ int set_VGM(int value)
+ 	return ret;
+ }
+ 
++static void msg_handler(int event, int value)
++{
++	char cmd[64];
++	static int sync_state = HFP_STATE_DISCONNECT;
++	switch (event) {
++		case HFP_EVENT_CONNECTION:
++			switch (value) {
++				case HFP_IND_DEVICE_DISCONNECTED:
++					INFO("HFP disconnected!!!\n");
++					set_sco_enable(0);
++					hfp_connected = 0;
++					sprintf(cmd, "echo %d > %s", HFP_STATE_DISCONNECT, HFP_STATE_FILE);
++					system(cmd);
++					break;
++				case HFP_IND_DEVICE_CONNECTED:
++					INFO("HFP connected!!!\n");
++					hfp_connected = 1;
++					if (0 != access(HFP_STATE_FILE, F_OK)) {
++						sprintf(cmd, "touch %s", HFP_STATE_FILE);
++						system(cmd);
++					}
++					sync_state = HFP_STATE_CONNECT;
++					sprintf(cmd, "echo %d > %s", HFP_STATE_CONNECT, HFP_STATE_FILE);
++					system(cmd);
++					break;
++			}
++			break;
++
++		case HFP_EVENT_CALL:
++			switch (value) {
++				case HFP_IND_CALL_NONE:
++					INFO("Call stopped!!!\n");
++					set_sco_enable(0);
++					sync_state = HFP_STATE_CALL_ENDED;
++					sprintf(cmd, "echo %d > %s", HFP_STATE_CALL_ENDED, HFP_STATE_FILE);
++					system(cmd);
++					break;
++				case HFP_IND_CALL_ACTIVE :
++					INFO("Call active!!!\n");
++					set_sco_enable(1);
++					sync_state = HFP_STATE_CALL_START;
++					sprintf(cmd, "echo %d > %s", HFP_STATE_CALL_START, HFP_STATE_FILE);
++					system(cmd);
++					break;
++			}
++			break;
++
++		case HFP_EVENT_CALLSETUP:
++			switch (value) {
++				case HFP_IND_CALLSETUP_NONE:
++					INFO("Callsetup stopped!!!\n");
++					if (sync_state != HFP_STATE_CALL_START) {
++						sync_state = HFP_STATE_CALL_IN_OUT_OVER;
++						sprintf(cmd, "echo %d > %s", HFP_STATE_CALL_IN_OUT_OVER, HFP_STATE_FILE);
++						system(cmd);
++					}
++					break;
++				case HFP_IND_CALLSETUP_IN :
++					INFO("An incomming Callsetup!!!\n");
++					sync_state = HFP_STATE_CALL_IN;
++					sprintf(cmd, "echo %d > %s", HFP_STATE_CALL_IN, HFP_STATE_FILE);
++					system(cmd);
++					break;
++				case HFP_IND_CALLSETUP_OUT :
++					INFO("An outgoing Callsetup!!!\n");
++					sync_state = HFP_STATE_CALL_OUT;
++					sprintf(cmd, "echo %d > %s", HFP_STATE_CALL_OUT, HFP_STATE_FILE);
++					system(cmd);
++					break;
++				case HFP_IND_CALLSETUP_OUT_ALERT :
++					INFO("Remote device being altered!!!\n");
++					sync_state = HFP_STATE_CALL_OUT_RINGING;
++					sprintf(cmd, "echo %d > %s", HFP_STATE_CALL_OUT_RINGING, HFP_STATE_FILE);
++					system(cmd);
++					break;
++			}
++			break;
++
++		case HFP_EVENT_VGS:
++			INFO("VGS EVENT!!!\n");
++			sVol = value;
++			break;
++		case HFP_EVENT_VGM:
++			INFO("VGM EVENT!!!\n");
++			mVol = value;
++			break;
++	}
++}
++
+ static void *hfp_ctl_monitor(void *arg)
+ {
+ 	int byte, value = -1, event =-1, i;
+ 	char msg[64];
+-
+ init:
+ 	hfp_ctl_sk = setup_socket_client(CTL_SOCKET_PATH);
+ 	if (hfp_ctl_sk < 0) {
+@@ -184,10 +312,14 @@ init:
+ 			goto init;
+ 		}
+ 
+-		if (byte == 2) {
+-			event = msg[0];
+-			value = msg[1];
+-			INFO("event = %d, value = %d\n", event, value);
++		if (byte >= 2) {
++			INFO("incoming msg of %d bytes\n", byte);
++			for (i = 0; i + 1 < byte; i += 2) {
++				event = msg[i];
++				value = msg[i + 1];
++				INFO("event = %d, value = %d\n", event, value);
++				msg_handler(event, value);
++			}
+ 		} else {
+ #if 0
+ 			INFO("invalid msg: %s\n", msg);
+@@ -196,61 +328,6 @@ init:
+ #endif
+ 			continue;
+ 		}
+-
+-		switch (event) {
+-			case HFP_EVENT_CONNECTION:
+-				switch (value) {
+-					case HFP_IND_DEVICE_DISCONNECTED:
+-						INFO("HFP disconnected!!!\n");
+-						set_sco_enable(0);
+-						hfp_connected = 0;
+-						break;
+-					case HFP_IND_DEVICE_CONNECTED:
+-						INFO("HFP connected!!!\n");
+-						hfp_connected = 1;
+-						break;
+-				}
+-				break;
+-
+-			case HFP_EVENT_CALL:
+-				switch (value) {
+-					case HFP_IND_CALL_NONE:
+-						INFO("Call stopped!!!\n");
+-						set_sco_enable(0);
+-						break;
+-					case HFP_IND_CALL_ACTIVE :
+-						INFO("Call active!!!\n");
+-						set_sco_enable(1);
+-						break;
+-				}
+-				break;
+-
+-			case HFP_EVENT_CALLSETUP:
+-				switch (value) {
+-					case HFP_IND_CALLSETUP_NONE:
+-						INFO("Callsetup stopped!!!\n");
+-						break;
+-					case HFP_IND_CALLSETUP_IN :
+-						INFO("An incomming Callsetup!!!\n");
+-						break;
+-					case HFP_IND_CALLSETUP_OUT :
+-						INFO("An outgoing Callsetup!!!\n");
+-						break;
+-					case HFP_IND_CALLSETUP_OUT_ALERT :
+-						INFO("Remote device being altered!!!\n");
+-						break;
+-				}
+-				break;
+-
+-			case HFP_EVENT_VGS:
+-				INFO("VGS EVENT!!!\n");
+-				sVol = value;
+-				break;
+-			case HFP_EVENT_VGM:
+-				INFO("VGM EVENT!!!\n");
+-				mVol = value;
+-				break;
+-		}
+ 	}
+ 	INFO("exit\n");
+ 	return NULL;
+@@ -260,21 +337,83 @@ static void signal_handler(int sig)
+ {
+ 	INFO("INT/TERM signal detected\n");
+ 	hfp_ctl_delinit();
++	msgctl(msqid, IPC_RMID, 0);
+ 	signal(sig, SIG_DFL);
+ 	exit(0);
+ }
+ 
+-
+ int main(int argc, char **argv)
+ {
++#ifdef CMD_HFP_CTL
++	struct msgstru msgs;
++	int ret;
++	const char *cmd_useage = {
++		"Usage:\n"
++		"\t -answer_call: answer call \n"
++		"\t -reject_call: reject call \n"
++		"\t -vol_spk_up: adjust speaker vol+ \n"
++		"\t -vol_spk_down: adjust speaker vol-\n"
++		"\t -vol_mic_up: adjust mic vol+ \n"
++		"\t -vol_mic_down: adjust mic vol-\n"
++	};
++
++	if (argc != 2 || !argv[1]) {
++		printf("%s", cmd_useage);
++		return -1;
++	}
+ 
++	msqid = msgget(MSGKEY, IPC_EXCL);
++	if (msqid < 0)
++	{
++		printf("msq is not exist!\n");
++		return -1;
++	}
++
++	if (!strcmp(argv[1], "-answer_call"))
++		strcpy(msgs.msgtext, "answer_call");
++	else if (!strcmp(argv[1], "-reject_call"))
++		strcpy(msgs.msgtext, "reject_call");
++	else if (!strcmp(argv[1], "-vol_spk_up"))
++		strcpy(msgs.msgtext, "vol_spk_up");
++	else if (!strcmp(argv[1], "-vol_spk_down"))
++		strcpy(msgs.msgtext, "vol_spk_down");
++	else if (!strcmp(argv[1], "-vol_mic_up"))
++		strcpy(msgs.msgtext, "vol_mic_up");
++	else if (!strcmp(argv[1], "-vol_mic_down"))
++		strcpy(msgs.msgtext, "vol_mic_down");
++	else {
++		printf("%s", cmd_useage);
++		return 0;
++	}
++
++	msgs.msgtype=MSGTYPE;
++	ret = msgsnd(msqid, &msgs, sizeof(msgs.msgtext), IPC_NOWAIT);
++	if (ret < 0)
++	{
++		printf("msgsnd() write msg failed,errno=%d[%s]\n", errno, strerror(errno));
++		return -1;
++	}
++	else
++		printf("send msg: %s!\n", msgs.msgtext);
++	return 0;
++#else
++	struct msgstru msgs;
+ 	if (hfp_ctl_init())
+ 		return -1;
+ 
+ 	signal(SIGINT, signal_handler);
+ 	signal(SIGTERM, signal_handler);
+-	while (!hfp_connected)
+-		sleep(1);
++
++	msqid = msgget(MSGKEY, IPC_EXCL);
++	if (msqid < 0)
++	{
++		msqid = msgget(MSGKEY, IPC_CREAT | 0666);
++		if (msqid < 0)
++		{
++			printf("can't creat\n");
++			exit(-1);
++		}
++	}
+ 
+ #if 0
+ 	answer_call();
+@@ -286,6 +425,24 @@ int main(int argc, char **argv)
+ 	reject_call();
+ #endif
+ 	while (1)
+-		sleep(1);
+-
++	{
++		int ret = msgrcv(msqid, &msgs, sizeof(msgs.msgtext), MSGTYPE, 0);
++		if (ret > 0)
++		{
++			printf("receive msg: %s\n", msgs.msgtext);
++			if (!strcmp(msgs.msgtext, "answer_call"))
++				answer_call();
++			else if (!strcmp(msgs.msgtext, "reject_call"))
++				reject_call();
++			else if (!strcmp(msgs.msgtext, "vol_spk_up"))
++				VGS_up();
++			else if (!strcmp(msgs.msgtext, "vol_spk_down"))
++				VGS_down();
++			else if (!strcmp(msgs.msgtext, "vol_mic_up"))
++				VGM_up();
++			else if (!strcmp(msgs.msgtext, "vol_mic_down"))
++				VGM_down();
++		}
++	}
++#endif
+ }
+-- 
+2.29.0
+

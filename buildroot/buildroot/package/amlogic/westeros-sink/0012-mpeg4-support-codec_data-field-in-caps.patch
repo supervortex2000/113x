@@ -1,0 +1,109 @@
+From 7e594cad9452a1f12c2c2d6d42cd5c60944147e1 Mon Sep 17 00:00:00 2001
+From: Song Zhao <song.zhao@amlogic.com>
+Date: Sun, 7 Mar 2021 17:10:56 -0800
+Subject: [PATCH 12/14] mpeg4: support codec_data field in caps
+
+Change-Id: Ib31bdde9fc35e76fcc59eb81d34524e1eeaef39c
+---
+ westeros-sink/v4l2/westeros-sink-soc.c | 39 ++++++++++++++++++++++++--
+ westeros-sink/v4l2/westeros-sink-soc.h |  3 ++
+ 2 files changed, 40 insertions(+), 2 deletions(-)
+
+diff --git a/westeros-sink/v4l2/westeros-sink-soc.c b/westeros-sink/v4l2/westeros-sink-soc.c
+index 61f519b..058a46f 100644
+--- a/westeros-sink/v4l2/westeros-sink-soc.c
++++ b/westeros-sink/v4l2/westeros-sink-soc.c
+@@ -1138,6 +1138,24 @@ gboolean gst_westeros_sink_soc_accept_caps( GstWesterosSink *sink, GstCaps *caps
+                      break;
+                }
+             }
++            {
++               const GValue *val= gst_structure_get_value( structure, "codec_data");
++
++               if ( val )
++               {
++                   GstBuffer *buf;
++                   GstMapInfo map;
++
++                   buf= gst_value_get_buffer (val);
++                   gst_buffer_map (buf, &map, GST_MAP_READ);
++                   /* allocate with enough padding */
++                   GST_DEBUG ("copy codec_data");
++                   sink->soc.extradata = (guint8 *)g_malloc0 (map.size);
++                   memcpy (sink->soc.extradata, map.data, map.size);
++                   sink->soc.extradata_size = map.size;
++                   gst_buffer_unmap (buf, &map);
++               }
++            }
+             result= TRUE;
+          }
+          #ifdef V4L2_PIX_FMT_HEVC
+@@ -1517,10 +1535,12 @@ void gst_westeros_sink_soc_render( GstWesterosSink *sink, GstBuffer *buffer )
+ 
+          if ( inSize )
+          {
+-            avail= inSize;
++            avail= inSize + sink->soc.extradata_size;
+             offset= 0;
+             while( offset < inSize )
+             {
++               guint8 *start;
++
+                buffIndex= wstGetInputBuffer( sink );
+                if ( (buffIndex < 0) && !sink->flushStarted )
+                {
+@@ -1539,6 +1559,7 @@ void gst_westeros_sink_soc_render( GstWesterosSink *sink, GstBuffer *buffer )
+                   UNLOCK(sink);
+                   goto exit;
+                }
++               start= (guint8 *)sink->soc.inBuffers[buffIndex].start;
+ 
+                copylen= sink->soc.inBuffers[buffIndex].capacity;
+                if ( copylen > avail )
+@@ -1546,7 +1567,16 @@ void gst_westeros_sink_soc_render( GstWesterosSink *sink, GstBuffer *buffer )
+                   copylen= avail;
+                }
+ 
+-               memcpy( sink->soc.inBuffers[buffIndex].start, &inData[offset], copylen );
++               if (sink->soc.extradata_size) {
++                  memcpy( start, sink->soc.extradata, sink->soc.extradata_size );
++                  start += sink->soc.extradata_size;
++                  avail -= sink->soc.extradata_size;
++                  sink->soc.extradata_size = 0;
++                  g_free (sink->soc.extradata);
++                  sink->soc.extradata = NULL;
++                  GST_DEBUG("copy meta to decoder");
++               }
++               memcpy( start, &inData[offset], copylen );
+ 
+                offset += copylen;
+                avail -= copylen;
+@@ -1829,6 +1859,11 @@ static void wstSinkSocStopVideo( GstWesterosSink *sink )
+       sink->soc.v4l2Fd= -1;
+       close( fdToClose );
+    }
++   if ( sink->soc.extradata ) {
++      g_free( sink->soc.extradata );
++      sink->soc.extradata = NULL;
++      sink->soc.extradata_size = 0;
++   }
+ 
+    sink->soc.prevFrame1Fd= -1;
+    sink->soc.prevFrame2Fd= -1;
+diff --git a/westeros-sink/v4l2/westeros-sink-soc.h b/westeros-sink/v4l2/westeros-sink-soc.h
+index fe2df98..471e87a 100644
+--- a/westeros-sink/v4l2/westeros-sink-soc.h
++++ b/westeros-sink/v4l2/westeros-sink-soc.h
+@@ -207,6 +207,9 @@ struct _GstWesterosSinkSoc
+    bool pip;
+    bool switch_video_plane;
+ 
++   guint8 *extradata;
++   int extradata_size;
++
+    gboolean haveColorimetry;
+    int hdrColorimetry[4];
+    gboolean haveMasteringDisplay;
+-- 
+2.31.0
+

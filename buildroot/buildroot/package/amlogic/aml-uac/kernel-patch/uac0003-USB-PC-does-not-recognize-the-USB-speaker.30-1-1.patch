@@ -1,0 +1,778 @@
+From 5738badb79634c0632275bb49e523f97b2c0ba86 Mon Sep 17 00:00:00 2001
+From: "ziheng.li" <ziheng.li@amlogic.com>
+Date: Tue, 28 Dec 2021 14:50:29 +0800
+Subject: [PATCH 1/2] USB: PC does not recognize the USB speaker.30% [1/1]
+
+PD#SWPL-68172
+
+Problem:
+1.PC does not recognize the USB speaker.30%.
+
+Solution:
+1.The root cause is that the CPU performance is insufficient,
+and DDMA is used to improve the data transfer rate.
+
+Verify:
+A113L AD403 Board
+
+Change-Id: I39c05cae4bdb6d7e56ca34d6d9af4d5c076c1234
+Signed-off-by: ziheng.li <ziheng.li@amlogic.com>
+---
+ drivers/amlogic/usb/dwc_otg/310/Makefile      |   1 +
+ drivers/amlogic/usb/dwc_otg/310/dwc_otg_cil.c |   2 +-
+ drivers/amlogic/usb/dwc_otg/310/dwc_otg_cil.h |   2 +-
+ .../amlogic/usb/dwc_otg/310/dwc_otg_driver.c  |  28 ++-
+ drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd.c | 163 +++++++++++++++---
+ drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd.h |   9 +
+ .../amlogic/usb/dwc_otg/310/dwc_otg_pcd_if.h  |   3 +-
+ .../usb/dwc_otg/310/dwc_otg_pcd_intr.c        |  39 +++++
+ .../usb/dwc_otg/310/dwc_otg_pcd_linux.c       | 112 ++++++++----
+ include/linux/usb/gadget.h                    |   9 +
+ 10 files changed, 303 insertions(+), 65 deletions(-)
+
+diff --git a/drivers/amlogic/usb/dwc_otg/310/Makefile b/drivers/amlogic/usb/dwc_otg/310/Makefile
+index 3bbfe506c932..cc57224718bf 100644
+--- a/drivers/amlogic/usb/dwc_otg/310/Makefile
++++ b/drivers/amlogic/usb/dwc_otg/310/Makefile
+@@ -11,6 +11,7 @@ KBUILD_CPPFLAGS	+= -DDEBUG
+ 
+ KBUILD_CPPFLAGS		+= -Dlinux -DDWC_HS_ELECT_TST
+ #KBUILD_CPPFLAGS	+= -DDWC_EN_ISOC
++KBUILD_CPPFLAGS		+= -DDWC_UTE_PER_IO
+ KBUILD_CPPFLAGS		+= -I$(srctree)/$(src)/$(COMMON_PORT)
+ #KBUILD_CPPFLAGS	+= -I$(PORTLIB)
+ KBUILD_CPPFLAGS		+= -DDWC_LINUX
+diff --git a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_cil.c b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_cil.c
+index 80d10edc572e..1441afc96713 100644
+--- a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_cil.c
++++ b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_cil.c
+@@ -1576,7 +1576,7 @@ void dwc_otg_enable_device_interrupts(dwc_otg_core_if_t *core_if)
+ 
+ /* Enable the ignore frame number for ISOC xfers - MAS */
+ /* Disable to support high bandwith ISOC transfers - manukz */
+-#if 0
++#if 1
+ #ifdef DWC_UTE_PER_IO
+ 	if (core_if->dma_enable) {
+ 		if (core_if->dma_desc_enable) {
+diff --git a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_cil.h b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_cil.h
+index 66420ee52118..659e9c71d6ed 100644
+--- a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_cil.h
++++ b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_cil.h
+@@ -817,7 +817,7 @@ struct ep_tx_fifo_info {
+ };
+ 
+ #define TX_EP_FIFO_NUM 5
+-#define ISO_EP_FIFO_LEN 256
++#define ISO_EP_FIFO_LEN 192
+ #define INTR_EP_FIFO_LEN 16
+ #define BULK_EP_FIFO_LEN 128
+ 
+diff --git a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_driver.c b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_driver.c
+index db410e519a45..4ed7fc64260b 100644
+--- a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_driver.c
++++ b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_driver.c
+@@ -1193,10 +1193,22 @@ static int dwc_otg_driver_probe(struct platform_device *pdev)
+ 	if (force_device_mode && (port_index == 0))
+ 		port_type = USB_PORT_TYPE_SLAVE;
+ 
+-	if (port_type == USB_PORT_TYPE_HOST)
++	if (port_type == USB_PORT_TYPE_HOST) {
++#ifdef DWC_UTE_PER_IO
++		dwc_otg_module_params.dma_desc_enable = 0;
++#endif
+ 		pcore_para->host_only = 1;
+-	else
++	} else if(port_type == USB_PORT_TYPE_SLAVE)  {
++#ifdef DWC_UTE_PER_IO
++		dwc_otg_module_params.dma_desc_enable = 1;
++#endif
++		pcore_para->host_only = 0;
++	} else {
++#ifdef DWC_UTE_PER_IO
++		dwc_otg_module_params.dma_desc_enable = 0;
++#endif
+ 		pcore_para->host_only = 0;
++	}
+ 
+ 	dev_dbg(&pdev->dev, "dwc_otg_device=0x%p\n", dwc_otg_device);
+ 
+@@ -1289,7 +1301,19 @@ static int dwc_otg_driver_probe(struct platform_device *pdev)
+ 					128;
+ 				dwc_otg_module_params.dev_tx_fifo_size[0] = 128;
+ 				dwc_otg_module_params.dev_tx_fifo_size[1] = 128;
++#ifdef DWC_UTE_PER_IO
++				/* Reserve spram for DDMA.
++				 * size = dev_endpoints * 4.
++				 * 4 locations per Device Endpoint direction.
++				 * DMA and DDMA mode does not need to transfer data through FIFO, and is carried directly to the DMA address.
++				 */
++				if (dwc_otg_module_params.dev_endpoints != -1)
++					dwc_otg_module_params.dev_tx_fifo_size[2] = 128 - 4 * dwc_otg_module_params.dev_endpoints;
++				else
++					dwc_otg_module_params.dev_tx_fifo_size[2] = 128 - 4 * core_if->core_params->dev_endpoints;
++#else
+ 				dwc_otg_module_params.dev_tx_fifo_size[2] = 128;
++#endif
+ 				dwc_otg_module_params.dev_tx_fifo_size[3] = 16;
+ 				dwc_otg_module_params.dev_tx_fifo_size[4] = 16;
+ 			} else {
+diff --git a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd.c b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd.c
+index cf7f7e559483..aa37d6c6b27a 100644
+--- a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd.c
++++ b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd.c
+@@ -201,6 +201,11 @@ void dwc_otg_request_done(dwc_otg_pcd_ep_t *ep, dwc_otg_pcd_request_t *req,
+ 	DWC_FREE(req);
+ }
+ 
++#ifdef DWC_UTE_PER_IO
++void dwc_otg_xiso_request_done(dwc_otg_pcd_ep_t *ep, dwc_otg_pcd_request_t *req,
++			  int32_t status);
++#endif
++
+ /**
+  * This function terminates all the requsts in the EP request queue.
+  */
+@@ -213,7 +218,12 @@ void dwc_otg_request_nuke(dwc_otg_pcd_ep_t *ep)
+ 	/* called with irqs blocked?? */
+ 	while (!DWC_CIRCLEQ_EMPTY(&ep->queue)) {
+ 		req = DWC_CIRCLEQ_FIRST(&ep->queue);
+-		dwc_otg_request_done(ep, req, -DWC_E_SHUTDOWN);
++#ifdef DWC_UTE_PER_IO
++		if (ep->dwc_ep.type == DWC_OTG_EP_TYPE_ISOC)
++			dwc_otg_xiso_request_done(ep, req, -DWC_E_SHUTDOWN);
++		else
++#endif
++			dwc_otg_request_done(ep, req, -DWC_E_SHUTDOWN);
+ 	}
+ }
+ 
+@@ -1823,6 +1833,10 @@ int dwc_otg_pcd_ep_disable(dwc_otg_pcd_t *pcd, void *ep_handle)
+ 	gdfifocfg_data_t gdfifocfgbase = {.d32 = 0 };
+ 	gdfifocfg_data_t gdfifocfg = {.d32 = 0 };
+ 	fifosize_data_t dptxfsiz = {.d32 = 0 };
++#ifdef DWC_UTE_PER_IO
++	depctl_data_t depctl = {.d32 = 0 };
++	volatile uint32_t *addr;
++#endif
+ 
+ 	ep = get_ep_from_handle(pcd, ep_handle);
+ 
+@@ -1831,6 +1845,23 @@ int dwc_otg_pcd_ep_disable(dwc_otg_pcd_t *pcd, void *ep_handle)
+ 		return -DWC_E_INVALID;
+ 	}
+ 
++#ifdef DWC_UTE_PER_IO
++	if (ep->dwc_ep.type == DWC_OTG_EP_TYPE_ISOC) {
++		if (ep->dwc_ep.is_in == 1)
++			addr = &GET_CORE_IF(pcd)->dev_if->in_ep_regs[ep->dwc_ep.num]->diepctl;
++		else
++			addr = &GET_CORE_IF(pcd)->dev_if->out_ep_regs[ep->dwc_ep.num]->doepctl;
++
++		/* disable the ep */
++		depctl.d32 = DWC_READ_REG32(addr);
++
++		depctl.b.epdis = 1;
++		depctl.b.snak = 1;
++
++		DWC_WRITE_REG32(addr, depctl.d32);
++	}
++#endif
++
+ 	DWC_SPINLOCK_IRQSAVE(pcd->lock, &flags);
+ 	dwc_otg_request_nuke(ep);
+ 
+@@ -1876,7 +1907,9 @@ int dwc_otg_pcd_ep_disable(dwc_otg_pcd_t *pcd, void *ep_handle)
+ 
+ 	/* Free DMA Descriptors */
+ 	if (GET_CORE_IF(pcd)->dma_desc_enable) {
++#ifndef DWC_UTE_PER_IO
+ 		if (ep->dwc_ep.type != UE_ISOCHRONOUS) {
++#endif
+ 			desc_addr = ep->dwc_ep.desc_addr;
+ 			dma_desc_addr = ep->dwc_ep.dma_desc_addr;
+ 
+@@ -1886,7 +1919,9 @@ int dwc_otg_pcd_ep_disable(dwc_otg_pcd_t *pcd, void *ep_handle)
+ 						   MAX_DMA_DESC_CNT);
+ 
+ 			goto out_unlocked;
++#ifndef DWC_UTE_PER_IO
+ 		}
++#endif
+ 	}
+ 	DWC_SPINUNLOCK_IRQRESTORE(pcd->lock, flags);
+ 
+@@ -1915,7 +1950,7 @@ void dwc_pcd_xiso_ereq_free(dwc_otg_pcd_ep_t *ep, dwc_otg_pcd_request_t *req)
+  *
+  */
+ int dwc_otg_pcd_xiso_start_next_request(dwc_otg_pcd_t *pcd,
+-					dwc_otg_pcd_ep_t *ep)
++					dwc_otg_pcd_ep_t *ep, int bna)
+ {
+ 	int i;
+ 	dwc_otg_pcd_request_t *req = NULL;
+@@ -1926,10 +1961,12 @@ int dwc_otg_pcd_xiso_start_next_request(dwc_otg_pcd_t *pcd,
+ 	depctl_data_t diepctl;
+ 
+ 	dwcep = &ep->dwc_ep;
+-
+-	if (dwcep->xiso_active_xfers > 0)
+-		return 0;
+-
++	if (bna) {
++		dwcep->xiso_active_xfers = 0;
++	} else {
++		if (dwcep->xiso_active_xfers > 0)
++			return 0;
++	}
+ 	nat = UGETW(ep->desc->wMaxPacketSize);
+ 	nat = (nat >> 11) & 0x03;
+ 
+@@ -1941,7 +1978,7 @@ int dwc_otg_pcd_xiso_start_next_request(dwc_otg_pcd_t *pcd,
+ 		/* Get the frame number */
+ 		dwcep->xiso_frame_num =
+ 		    dwc_otg_get_frame_number(GET_CORE_IF(pcd));
+-		DWC_DEBUG("FRM_NUM=%d", dwcep->xiso_frame_num);
++		//DWC_DEBUG("FRM_NUM=%d", dwcep->xiso_frame_num);
+ 
+ 		ddesc_iso = ereq->per_io_frame_descs;
+ 
+@@ -1952,7 +1989,7 @@ int dwc_otg_pcd_xiso_start_next_request(dwc_otg_pcd_t *pcd,
+ 					dwcep->xiso_frame_num = (dwcep->xiso_bInterval +
+ 										dwcep->xiso_frame_num) & 0x3FFF;
+ 				dwcep->desc_addr[i].buf =
+-				    req->dma + ddesc_iso[i].offset;
++				    req->xiso_dma + ddesc_iso[i].offset;
+ 				dwcep->desc_addr[i].status.b_iso_in.txbytes =
+ 				    ddesc_iso[i].length;
+ 				dwcep->desc_addr[i].status.b_iso_in.framenum =
+@@ -1991,7 +2028,7 @@ int dwc_otg_pcd_xiso_start_next_request(dwc_otg_pcd_t *pcd,
+ 				dwcep->xiso_frame_num = (dwcep->xiso_bInterval +
+ 										dwcep->xiso_frame_num) & 0x3FFF;
+ 				dwcep->desc_addr[i].buf =
+-				    req->dma + ddesc_iso[i].offset;
++				    req->xiso_dma + ddesc_iso[i].offset;
+ 				dwcep->desc_addr[i].status.b_iso_out.rxbytes =
+ 				    ddesc_iso[i].length;
+ 				dwcep->desc_addr[i].status.b_iso_out.framenum =
+@@ -2098,7 +2135,7 @@ void complete_xiso_ep(dwc_otg_pcd_ep_t *ep)
+ 	dwc_pcd_xiso_ereq_free(ep, req);
+ 
+ 	/* Start the next request */
+-	dwc_otg_pcd_xiso_start_next_request(ep->pcd, ep);
++	dwc_otg_pcd_xiso_start_next_request(ep->pcd, ep, 0);
+ 
+ 	return;
+ }
+@@ -2108,18 +2145,18 @@ void complete_xiso_ep(dwc_otg_pcd_ep_t *ep)
+  *
+  */
+ static int dwc_otg_pcd_xiso_create_pkt_descs(dwc_otg_pcd_request_t *req,
+-					     void *ereq_nonport,
++					     void *req_handle,
+ 					     int atomic_alloc)
+ {
+ 	struct dwc_iso_xreq_port *ereq = NULL;
+-	struct dwc_iso_xreq_port *req_mapped = NULL;
++	struct usb_request *usb_req = NULL;
+ 	struct dwc_iso_pkt_desc_port *ipds = NULL;	/* To be created in this function */
+ 	uint32_t pkt_count;
+ 	int i;
+ 
+ 	ereq = &req->ext_req;
+-	req_mapped = (struct dwc_iso_xreq_port *)ereq_nonport;
+-	pkt_count = req_mapped->pio_pkt_count;
++	usb_req = (struct usb_request *)req_handle;
++	pkt_count = usb_req->xios_count;
+ 
+ 	/* Create the isoc descs */
+ 	if (atomic_alloc)
+@@ -2131,26 +2168,27 @@ static int dwc_otg_pcd_xiso_create_pkt_descs(dwc_otg_pcd_request_t *req,
+ 		DWC_ERROR("Failed to allocate isoc descriptors");
+ 		return -DWC_E_NO_MEMORY;
+ 	}
+-
++	req->xiso_dma = usb_req->xios_dma;
+ 	/* Initialize the extended request fields */
+ 	ereq->per_io_frame_descs = ipds;
+ 	ereq->error_count = 0;
+ 	ereq->pio_alloc_pkt_count = pkt_count;
+ 	ereq->pio_pkt_count = pkt_count;
+-	ereq->tr_sub_flags = req_mapped->tr_sub_flags;
++	ereq->tr_sub_flags = DWC_EREQ_TF_ASAP;
+ 
+ 	/* Init the Isoc descriptors */
+ 	for (i = 0; i < pkt_count; i++) {
+-		ipds[i].length = req_mapped->per_io_frame_descs[i].length;
+-		ipds[i].offset = req_mapped->per_io_frame_descs[i].offset;
+-		ipds[i].status = req_mapped->per_io_frame_descs[i].status;	/* 0 */
++		ipds[i].length = usb_req->length;
++		ipds[i].offset = i * usb_req->xios_offset;
++		ipds[i].status = usb_req->status;	/* 0 */
+ 		ipds[i].actual_length =
+-		    req_mapped->per_io_frame_descs[i].actual_length;
++		    usb_req->actual;
+ 	}
+ 
+ 	return 0;
+ }
+ 
++#if 0
+ static void prn_ext_request(struct dwc_iso_xreq_port *ereq)
+ {
+ 	struct dwc_iso_pkt_desc_port *xfd = NULL;
+@@ -2173,14 +2211,14 @@ static void prn_ext_request(struct dwc_iso_xreq_port *ereq)
+ 		DWC_DEBUG("xfd->status=%d", xfd->status);
+ 	}
+ }
++#endif
+ 
+ /**
+  *
+  */
+ int dwc_otg_pcd_xiso_ep_queue(dwc_otg_pcd_t *pcd, void *ep_handle,
+ 			      uint8_t *buf, dwc_dma_t dma_buf, uint32_t buflen,
+-			      int zero, void *req_handle, int atomic_alloc,
+-			      void *ereq_nonport)
++			      int zero, void *req_handle, int atomic_alloc)
+ {
+ 	dwc_otg_pcd_request_t *req = NULL;
+ 	dwc_otg_pcd_ep_t *ep;
+@@ -2194,10 +2232,20 @@ int dwc_otg_pcd_xiso_ep_queue(dwc_otg_pcd_t *pcd, void *ep_handle,
+ 	}
+ 
+ 	/* We support this extension only for DDMA mode */
+-	if (ep->dwc_ep.type == DWC_OTG_EP_TYPE_ISOC)
++	if (ep->dwc_ep.type == DWC_OTG_EP_TYPE_ISOC) {
+ 		if (!GET_CORE_IF(pcd)->dma_desc_enable)
+ 			return -DWC_E_INVALID;
+ 
++		DWC_SPINLOCK_IRQSAVE(pcd->lock, &flags);
++		/* make sure it's actually queued on this endpoint */
++		DWC_CIRCLEQ_FOREACH(req, &ep->queue, queue_entry) {
++			if (req->priv == req_handle) {
++				DWC_SPINUNLOCK_IRQRESTORE(pcd->lock, flags);
++				return 0;
++			}
++		}
++		DWC_SPINUNLOCK_IRQRESTORE(pcd->lock, flags);
++	}
+ 	/* Create a dwc_otg_pcd_request_t object */
+ 	if (atomic_alloc)
+ 		req = DWC_ALLOC_ATOMIC(sizeof(*req));
+@@ -2210,7 +2258,7 @@ int dwc_otg_pcd_xiso_ep_queue(dwc_otg_pcd_t *pcd, void *ep_handle,
+ 	/* Create the Isoc descs for this request which shall be the exact match
+ 	 * of the structure sent to us from the non-portable logic */
+ 	res =
+-	    dwc_otg_pcd_xiso_create_pkt_descs(req, ereq_nonport, atomic_alloc);
++	    dwc_otg_pcd_xiso_create_pkt_descs(req, req_handle, atomic_alloc);
+ 	if (res) {
+ 		DWC_WARN("Failed to init the Isoc descriptors");
+ 		DWC_FREE(req);
+@@ -2243,7 +2291,7 @@ int dwc_otg_pcd_xiso_ep_queue(dwc_otg_pcd_t *pcd, void *ep_handle,
+ 	 * from the queue and start that transfer
+ 	 */
+ 	if (req->ext_req.tr_sub_flags == DWC_EREQ_TF_ASAP) {
+-		res = dwc_otg_pcd_xiso_start_next_request(pcd, ep);
++		res = dwc_otg_pcd_xiso_start_next_request(pcd, ep, 0);
+ 		if (res) {
+ 			DWC_WARN("Failed to start the next Isoc transfer");
+ 			DWC_SPINUNLOCK_IRQRESTORE(pcd->lock, flags);
+@@ -2256,6 +2304,59 @@ int dwc_otg_pcd_xiso_ep_queue(dwc_otg_pcd_t *pcd, void *ep_handle,
+ 	return 0;
+ }
+ 
++void dwc_otg_xiso_request_done(dwc_otg_pcd_ep_t *ep, dwc_otg_pcd_request_t *req,
++			  int32_t status)
++{
++	struct dwc_iso_xreq_port *ereq = NULL;
++	struct dwc_iso_pkt_desc_port *ddesc_iso = NULL;
++	dwc_ep_t *dwcep = NULL;
++	int i;
++
++	dwcep = &ep->dwc_ep;
++	dwcep->xiso_active_xfers--;
++	dwcep->xiso_queued_xfers--;
++	/* Remove this request from the queue */
++	DWC_CIRCLEQ_REMOVE_INIT(&ep->queue, req, queue_entry);
++
++	ep->stopped = 1;
++	ereq = &req->ext_req;
++	ddesc_iso = ereq->per_io_frame_descs;
++
++	if (dwcep->xiso_active_xfers < 0) {
++		DWC_WARN("EP#%d (xiso_active_xfers=%d)", dwcep->num,
++			 dwcep->xiso_active_xfers);
++	}
++
++	/* Fill the Isoc descs of portable extended req from dma descriptors */
++	for (i = 0; i < ereq->pio_pkt_count; i++) {
++		if (dwcep->is_in) {	/* IN endpoints */
++			ddesc_iso[i].actual_length = ddesc_iso[i].length -
++			    dwcep->desc_addr[i].status.b_iso_in.txbytes;
++			ddesc_iso[i].status =
++			    dwcep->desc_addr[i].status.b_iso_in.txsts;
++		} else {	/* OUT endpoints */
++			ddesc_iso[i].actual_length = ddesc_iso[i].length -
++			    dwcep->desc_addr[i].status.b_iso_out.rxbytes;
++			ddesc_iso[i].status =
++			    dwcep->desc_addr[i].status.b_iso_out.rxsts;
++		}
++	}
++
++	DWC_SPINUNLOCK(ep->pcd->lock);
++
++	/* Call the completion function in the non-portable logic */
++	ep->pcd->fops->xisoc_complete(ep->pcd, ep->priv, req->priv, status,
++				      &req->ext_req);
++
++	DWC_SPINLOCK(ep->pcd->lock);
++
++	/* Free the request - specific freeing needed for extended request object */
++	dwc_pcd_xiso_ereq_free(ep, req);
++
++	/* Start the next request */
++	dwc_otg_pcd_xiso_start_next_request(ep->pcd, ep, 0);
++}
++
+ #endif
+ /* END ifdef DWC_UTE_PER_IO ***************************************************/
+ int dwc_otg_pcd_ep_queue(dwc_otg_pcd_t *pcd, void *ep_handle,
+@@ -2513,10 +2614,16 @@ int dwc_otg_pcd_ep_dequeue(dwc_otg_pcd_t *pcd, void *ep_handle,
+ 		return -DWC_E_INVALID;
+ 	}
+ 
+-	if (!DWC_CIRCLEQ_EMPTY_ENTRY(req, queue_entry))
+-		dwc_otg_request_done(ep, req, -DWC_E_RESTART);
+-	else
++	if (!DWC_CIRCLEQ_EMPTY_ENTRY(req, queue_entry)) {
++#ifdef DWC_UTE_PER_IO
++		if (ep->dwc_ep.type == DWC_OTG_EP_TYPE_ISOC)
++			dwc_otg_xiso_request_done(ep, req, -DWC_E_RESTART);
++		else
++#endif
++			dwc_otg_request_done(ep, req, -DWC_E_RESTART);
++	} else {
+ 		req = NULL;
++	}
+ 
+ 	DWC_SPINUNLOCK_IRQRESTORE(pcd->lock, flags);
+ 
+diff --git a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd.h b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd.h
+index ba54785315d1..a4d906b48488 100644
+--- a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd.h
++++ b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd.h
+@@ -43,6 +43,10 @@
+ extern dwc_otg_device_t *g_dwc_otg_device[2];
+ struct cfiobject;
+ 
++#ifdef DWC_UTE_PER_IO
++#define XISO_MAX_PKT 4
++#endif
++
+ /**
+  * @file
+  *
+@@ -145,6 +149,7 @@ typedef struct dwc_otg_pcd_request {
+ 
+ 	 DWC_CIRCLEQ_ENTRY(dwc_otg_pcd_request) queue_entry;
+ #ifdef DWC_UTE_PER_IO
++	dwc_dma_t xiso_dma;
+ 	struct dwc_iso_xreq_port ext_req;
+ #endif
+ } dwc_otg_pcd_request_t;
+@@ -272,6 +277,10 @@ extern void dwc_otg_request_done(dwc_otg_pcd_ep_t *ep,
+ 
+ void dwc_otg_iso_buffer_done(dwc_otg_pcd_t *pcd, dwc_otg_pcd_ep_t *ep,
+ 			     void *req_handle);
++#ifdef DWC_UTE_PER_IO
++extern int dwc_otg_pcd_xiso_start_next_request(dwc_otg_pcd_t *pcd,
++					dwc_otg_pcd_ep_t *ep, int bna);
++#endif
+ 
+ extern void do_test_mode(void *data);
+ #ifdef CONFIG_AMLOGIC_USB3PHY
+diff --git a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd_if.h b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd_if.h
+index 11fb080050b9..1b104e525af1 100644
+--- a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd_if.h
++++ b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd_if.h
+@@ -210,8 +210,7 @@ extern int dwc_otg_pcd_ep_queue(dwc_otg_pcd_t *pcd, void *ep_handle,
+ extern int dwc_otg_pcd_xiso_ep_queue(dwc_otg_pcd_t *pcd, void *ep_handle,
+ 				     uint8_t *buf, dwc_dma_t dma_buf,
+ 				     uint32_t buflen, int zero,
+-				     void *req_handle, int atomic_alloc,
+-				     void *ereq_nonport);
++				     void *req_handle, int atomic_alloc);
+ 
+ #endif
+ 
+diff --git a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd_intr.c b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd_intr.c
+index 0b862d19f3bd..19d879a3530b 100644
+--- a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd_intr.c
++++ b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd_intr.c
+@@ -3109,6 +3109,15 @@ static void complete_iso_ep(dwc_otg_pcd_t *pcd, dwc_otg_pcd_ep_t *ep)
+ }
+ #endif /* DWC_EN_ISOC */
+ 
++#ifdef DWC_UTE_PER_IO
++static void dwc_otg_pcd_handle_iso_bna(dwc_otg_pcd_ep_t *ep)
++{
++	dwc_otg_pcd_t *pcd = ep->pcd;
++
++	dwc_otg_pcd_xiso_start_next_request(pcd, ep, 1);
++}
++#endif
++
+ /**
+  * This function handle BNA interrupt for Non Isochronous EPs
+  *
+@@ -3540,6 +3549,10 @@ static inline void handle_in_ep_disable_intr(dwc_otg_pcd_t *pcd,
+ 	dwc_ep = &ep->dwc_ep;
+ 
+ 	if (dwc_ep->type == DWC_OTG_EP_TYPE_ISOC) {
++#ifdef DWC_UTE_PER_IO
++		if (dwc_ep->is_in)
++			return;
++#endif
+ 		dwc_otg_flush_tx_fifo(core_if, dwc_ep->tx_fifo_num);
+ 		complete_ep(ep);
+ 		return;
+@@ -4049,6 +4062,19 @@ do { \
+ 							dwc_otg_pcd_handle_iso_bna(ep);
+ 					} else
+ #endif				/* DWC_EN_ISOC */
++#ifdef DWC_UTE_PER_IO
++					if (dwc_ep->type ==
++						DWC_OTG_EP_TYPE_ISOC) {
++						/*
++						 * This checking is performed
++						 * to prevent
++						 * first "false" BNA
++						 * handling occuring
++						 * right after reconnect
++						 */
++						dwc_otg_pcd_handle_iso_bna(ep);
++					} else
++#endif
+ 					{
+ 						dwc_otg_pcd_handle_noniso_bna(ep);
+ 					}
+@@ -4582,6 +4608,19 @@ do { \
+ 							dwc_otg_pcd_handle_iso_bna(ep);
+ 					} else
+ #endif				/* DWC_EN_ISOC */
++#ifdef DWC_UTE_PER_IO
++					if (dwc_ep->type ==
++						DWC_OTG_EP_TYPE_ISOC) {
++						/*
++						 * This checking is performed
++						 * to prevent
++						 * first "false" BNA
++						 * handling occuring
++						 * right after reconnect
++						 */
++						dwc_otg_pcd_handle_iso_bna(ep);
++					} else
++#endif
+ 					{
+ 						dwc_otg_pcd_handle_noniso_bna(ep);
+ 					}
+diff --git a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd_linux.c b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd_linux.c
+index 3597106e3790..e57216dc73b6 100644
+--- a/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd_linux.c
++++ b/drivers/amlogic/usb/dwc_otg/310/dwc_otg_pcd_linux.c
+@@ -221,7 +221,15 @@ static struct usb_request *dwc_otg_pcd_alloc_request(struct usb_ep *ep,
+ 	}
+ 	memset(usb_req, 0, sizeof(*usb_req));
+ 	usb_req->dma = DWC_DMA_ADDR_INVALID;
+-
++#ifdef DWC_UTE_PER_IO
++	usb_req->xios_dma = DWC_DMA_ADDR_INVALID;
++	usb_req->xios_buf = 0;
++	usb_req->xios_length = 0;
++	usb_req->xios_offset = 0;
++	usb_req->xios_count = 0;
++	usb_req->ur_buf = 0;
++	usb_req->ur_dma = DWC_DMA_ADDR_INVALID;
++#endif
+ 	return usb_req;
+ }
+ 
+@@ -378,12 +386,30 @@ static int ep_queue(struct usb_ep *usb_ep, struct usb_request *usb_req,
+ 		}
+ 	}
+ 
+-
+ #ifdef DWC_UTE_PER_IO
+ 	if (is_isoc_ep == 1) {
++		if (usb_req->xios_dma == DWC_DMA_ADDR_INVALID && !usb_req->xios_buf) {
++			/*
++			 * DDMA requires 8-byte alignment.
++			 */
++			usb_req->xios_offset = ((usb_req->length / 8) + ((usb_req->length % 8) ? 1 : 0)) * 8;
++			usb_req->xios_count = XISO_MAX_PKT;
++			usb_req->xios_length = usb_req->xios_offset * usb_req->xios_count;
++			usb_req->xios_buf = DWC_DMA_ALLOC_ATOMIC(usb_req->xios_length, &usb_req->xios_dma);
++			if (!usb_req->xios_buf) {
++				DWC_ERROR
++					("%s: Failed to allocate memory for dwc_ep xiso_buff\n",
++					__func__);
++				return -ENOMEM;
++			}
++			usb_req->ur_buf = usb_req->buf;
++			usb_req->ur_dma = usb_req->dma;
++		}
++		usb_req->dma = usb_req->ur_dma;
++		usb_req->buf = usb_req->ur_buf;
+ 		retval = dwc_otg_pcd_xiso_ep_queue(pcd, usb_ep, usb_req->buf, dma_addr,
+ 			usb_req->length, usb_req->zero, usb_req,
+-			gfp_flags == GFP_ATOMIC ? 1 : 0, &usb_req->ext_req);
++			gfp_flags == GFP_ATOMIC ? 1 : 0);
+ 		if (retval)
+ 			return -EINVAL;
+ 
+@@ -404,6 +430,10 @@ static int ep_queue(struct usb_ep *usb_ep, struct usb_request *usb_req,
+  */
+ static int ep_dequeue(struct usb_ep *usb_ep, struct usb_request *usb_req)
+ {
++#ifdef DWC_UTE_PER_IO
++	dwc_otg_pcd_t *pcd;
++	struct dwc_otg_pcd_ep *ep = NULL;
++#endif
+ 	DWC_DEBUGPL(DBG_PCDV, "%s(%p,%p)\n", __func__, usb_ep, usb_req);
+ 
+ 	if (!usb_ep || !usb_req) {
+@@ -415,9 +445,26 @@ static int ep_dequeue(struct usb_ep *usb_ep, struct usb_request *usb_req)
+ 		DWC_WARN("bogus device state\n");
+ 		return -ESHUTDOWN;
+ 	}
++
+ 	if (dwc_otg_pcd_ep_dequeue(gadget_wrapper->pcd, usb_ep, usb_req))
+ 		return -EINVAL;
+ 
++#ifdef DWC_UTE_PER_IO
++	pcd = gadget_wrapper->pcd;
++	ep = ep_from_handle(pcd, usb_ep);
++	if (ep == NULL) {
++		DWC_ERROR("bad pcd ep\n");
++		return -EINVAL;
++	}
++	if (ep->dwc_ep.type == DWC_OTG_EP_TYPE_ISOC) {
++		usb_req->dma = usb_req->ur_dma;
++		usb_req->buf = usb_req->ur_buf;
++		DWC_DMA_FREE(usb_req->xios_length, usb_req->xios_buf, usb_req->xios_dma);
++		usb_req->xios_dma = DWC_DMA_ADDR_INVALID;
++		usb_req->xios_buf = NULL;
++	}
++#endif
++
+ 	return 0;
+ }
+ 
+@@ -880,45 +927,42 @@ static int _isoc_complete(dwc_otg_pcd_t *pcd, void *ep_handle,
+ static int _xisoc_complete(dwc_otg_pcd_t *pcd, void *ep_handle,
+ 			   void *req_handle, int32_t status, void *ereq_port)
+ {
+-	struct dwc_ute_iso_req_ext *ereqorg = NULL;
+ 	struct dwc_iso_xreq_port *ereqport = NULL;
+-	struct dwc_ute_iso_packet_descriptor *desc_org = NULL;
+-	int i;
+ 	struct usb_request *req;
++	int i;
+ 
+ 	req = (struct usb_request *)req_handle;
+-	ereqorg = &req->ext_req;
+ 	ereqport = (struct dwc_iso_xreq_port *)ereq_port;
+-	desc_org = ereqorg->per_io_frame_descs;
+ 
+ 	if (req && req->complete) {
+-		/* Copy the request data from the portable logic to our request */
+ 		for (i = 0; i < ereqport->pio_pkt_count; i++) {
+-			desc_org[i].actual_length =
++			/* Copy the request data from the portable logic to our request */
++			req->actual =
+ 			    ereqport->per_io_frame_descs[i].actual_length;
+-			desc_org[i].status =
++			req->status =
+ 			    ereqport->per_io_frame_descs[i].status;
++			req->buf = req->xios_buf + ereqport->per_io_frame_descs[i].offset;
++			req->dma = req->xios_dma + ereqport->per_io_frame_descs[i].offset;
++			switch (status) {
++			case -DWC_E_SHUTDOWN:
++				req->status = -ESHUTDOWN;
++				break;
++			case -DWC_E_RESTART:
++				req->status = -ECONNRESET;
++				break;
++			case -DWC_E_INVALID:
++				req->status = -EINVAL;
++				break;
++			case -DWC_E_TIMEOUT:
++				req->status = -ETIMEDOUT;
++				break;
++			default:
++				req->status = status;
++			}
++
++			/* And call the gadget's completion */
++			req->complete(ep_handle, req);
+ 		}
+-
+-		switch (status) {
+-		case -DWC_E_SHUTDOWN:
+-			req->status = -ESHUTDOWN;
+-			break;
+-		case -DWC_E_RESTART:
+-			req->status = -ECONNRESET;
+-			break;
+-		case -DWC_E_INVALID:
+-			req->status = -EINVAL;
+-			break;
+-		case -DWC_E_TIMEOUT:
+-			req->status = -ETIMEDOUT;
+-			break;
+-		default:
+-			req->status = status;
+-		}
+-
+-		/* And call the gadget's completion */
+-		req->complete(ep_handle, req);
+ 	}
+ 
+ 	return 0;
+@@ -964,6 +1008,12 @@ static int _complete(dwc_otg_pcd_t *pcd, void *ep_handle,
+ 		dev = &gadget_wrapper->pcd->otg_dev->os_dep.pldev->dev;
+ 
+ 		ep = ep_from_handle(pcd, ep_handle);
++#ifdef DWC_UTE_PER_IO
++		if (ep->dwc_ep.type == DWC_OTG_EP_TYPE_ISOC) {
++			req->dma = req->ur_dma;
++			req->buf = req->ur_buf;
++		}
++#endif
+ 		if (GET_CORE_IF(pcd)->dma_enable) {
+ 			if (req->length != 0)
+ 				dma_unmap_single(dev, req->dma, req->length,
+diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
+index e5cd84a0f84a..6ed8a5dc51b6 100644
+--- a/include/linux/usb/gadget.h
++++ b/include/linux/usb/gadget.h
+@@ -114,6 +114,15 @@ struct usb_request {
+ 
+ 	int			status;
+ 	unsigned		actual;
++
++	void			*ur_buf;
++	dma_addr_t		ur_dma;
++
++	void			*xios_buf;
++	dma_addr_t		xios_dma;
++	unsigned		xios_length;
++	unsigned		xios_offset;
++	unsigned		xios_count;
+ };
+ 
+ /*-------------------------------------------------------------------------*/
+-- 
+2.31.1
+

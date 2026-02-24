@@ -1,0 +1,7 @@
+menuconfig BR2_PACKAGE_IARMMGRS_HAL_LLAMA
+	bool "iarmmgrs-hal-llama"
+	select BR2_PACKAGE_IARMMGRS-HAL-HEADERS
+	select BR2_PACKAGE_IARMBUS
+	help
+	   rdk iarmmgrs-hal-llama .
+

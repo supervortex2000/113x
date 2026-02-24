@@ -1,0 +1,11 @@
+config BR2_PACKAGE_TEST_TOOLS
+	bool  "test tools"
+	help
+		function test for cpu & ddr & nand & emmc & usb & gpio & IR & wifi...
+
+config BR2_PACKAGE_SOUNDBAR_TEST
+	bool  "soundbar test"
+	depends on BR2_PACKAGE_TEST_TOOLS
+	default n
+	help
+		function test for soundbar

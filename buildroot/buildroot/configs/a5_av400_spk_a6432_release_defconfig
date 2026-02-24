@@ -1,0 +1,8 @@
+#----------------------------------------------------------#
+#include "arch_a6432_10.3_7.3.1.config"
+
+#----------------------------------------------------------#
+#include "a5_av400_spk.config"
+#include "flash_emmc.config"
+#include "rootfs_squashfs.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesona5_av400_spk/initramfs/ramfslist-32-ext2"

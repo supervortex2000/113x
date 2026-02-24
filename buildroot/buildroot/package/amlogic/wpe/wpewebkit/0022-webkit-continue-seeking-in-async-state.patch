@@ -1,0 +1,23 @@
+diff --git a/Source/WebCore/platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.cpp b/Source/WebCore/platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.cpp
+index a6aeb9a..3953165e 100644
+--- a/Source/WebCore/platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.cpp
++++ b/Source/WebCore/platform/graphics/gstreamer/mse/MediaPlayerPrivateGStreamerMSE.cpp
+@@ -298,7 +298,7 @@ bool MediaPlayerPrivateGStreamerMSE::doSeek()
+         return false;
+     }
+     if ((getStateResult == GST_STATE_CHANGE_ASYNC
+-        && !(state == GST_STATE_PLAYING && newState == GST_STATE_PAUSED))
++        && (!((state == GST_STATE_PLAYING || state == GST_STATE_PAUSED) && newState == GST_STATE_PAUSED)))
+         || state < GST_STATE_PAUSED
+         || m_isEndReached
+         || !m_gstSeekCompleted) {
+@@ -428,7 +428,7 @@ void MediaPlayerPrivateGStreamerMSE::maybeFinishSeek()
+     GstStateChangeReturn getStateResult = gst_element_get_state(m_pipeline.get(), &state, &newState, 0);
+ 
+     if (getStateResult == GST_STATE_CHANGE_ASYNC
+-        && !(state == GST_STATE_PLAYING && newState == GST_STATE_PAUSED)) {
++        && !((state == GST_STATE_PLAYING || state == GST_STATE_PAUSED) && newState == GST_STATE_PAUSED)) {
+         GST_DEBUG("[Seek] Delaying seek finish");
+         return;
+     }
+

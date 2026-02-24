@@ -1,0 +1,4 @@
+config BR2_PACKAGE_TROWER_BASE64
+	bool "trower-base64"
+	help
+	   rdk trower-base64

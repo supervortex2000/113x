@@ -1,0 +1,8 @@
+#----------------------------------------------------------#
+#include "arch_a64_7.3.1.config"
+
+#----------------------------------------------------------#
+#include "c2_af400_uvc.config"
+#include "flash_emmc.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesonc2_af400/initramfs/ramfslist-uvc-64"
+BR2_PACKAGE_AML_KERNEL_PATCHDIR="board/amlogic/mesonc2_af400/uvc-kernel-patch"

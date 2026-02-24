@@ -1,0 +1,4 @@
+config BR2_PACKAGE_LVMEDIA_TSPLAYER
+    bool "lvmedia_tsplayer"
+    help
+        lvmedia_tsplayer src

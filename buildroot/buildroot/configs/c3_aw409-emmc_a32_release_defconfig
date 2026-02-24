@@ -1,0 +1,11 @@
+#----------------------------------------------------------#
+#include "arch_a32_10.3.config"
+
+#----------------------------------------------------------#
+#include "c3_aw401.config"
+BR2_LINUX_KERNEL_INTREE_DTS_NAME="c3_c302x_aw409-emmc_256m c3_c302x_aw409-emmc_128m"
+BR2_TARGET_UBOOT_BOARDNAME="c3_aw409"
+#include "flash_emmc.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesonc3_aw409/initramfs/ramfslist-32-ext2"
+BR2_LINUX_KERNEL_DEFCONFIG="meson64_a32_C3_mini"
+

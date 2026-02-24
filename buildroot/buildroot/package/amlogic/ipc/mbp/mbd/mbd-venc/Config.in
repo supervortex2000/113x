@@ -1,0 +1,5 @@
+config BR2_PACKAGE_MBD_VENC
+	bool "venc driver"
+	depends on BR2_PACKAGE_MBD_BASE
+	help
+		ipc mbd venc driver

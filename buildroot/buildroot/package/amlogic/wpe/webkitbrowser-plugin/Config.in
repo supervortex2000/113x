@@ -1,0 +1,4 @@
+config BR2_PACKAGE_WEBKITBROWSER_PLUGIN
+	bool "webkitbrowser-plugin"
+	help
+	   rdk webkitbrowser-plugin

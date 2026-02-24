@@ -1,0 +1,19 @@
+config BR2_PACKAGE_IPC_REFERENCE
+	bool "ipc reference"
+	depends on BR2_PACKAGE_MBI
+	depends on BR2_PACKAGE_SENSOR
+	select BR2_PACKAGE_OPENCV3
+	select BR2_PACKAGE_OPENCV3_LIB_IMGCODECS
+	select BR2_PACKAGE_OPENCV3_LIB_IMGPROC
+	select BR2_PACKAGE_OPENCV3_WITH_JPEG
+    help
+      c3 reference application
+
+if BR2_PACKAGE_IPC_REFERENCE
+
+config BR2_IPC_REFERENCE_DOORBELL
+	bool "c3 ipc doorbell demo"
+	help
+	  c3 ipc doorbell demo application
+
+endif

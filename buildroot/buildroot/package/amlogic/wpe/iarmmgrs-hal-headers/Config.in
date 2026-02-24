@@ -1,0 +1,5 @@
+menuconfig BR2_PACKAGE_IARMMGRS_HAL_HEADERS
+	bool "iarmmgrs-hal-headers"
+	help
+	   rdk iarmmgrs-hal-headers.
+

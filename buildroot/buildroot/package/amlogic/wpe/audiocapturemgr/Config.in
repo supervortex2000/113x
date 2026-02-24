@@ -1,0 +1,4 @@
+config BR2_PACKAGE_AUDIOCAPTUREMGR
+	bool "audiocapturemgr"
+	help
+	   rdk audiocapturemgr

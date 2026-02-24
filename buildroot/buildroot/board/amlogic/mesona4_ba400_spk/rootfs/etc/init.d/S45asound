@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+volume_file="/data/system_volume"
+
+function init_asound(){
+	if [ -f $volume_file ]; then
+		vol=`cat $volume_file`
+		amixer sset "5707_A Master" $vol
+        amixer sset "5707_B Master" $vol
+	else
+		amixer sset "5707_A Master" 150
+        amixer sset "5707_B Master" 150
+	fi
+	[ $? = 0 ] && echo "OK" || echo "FAIL"
+}
+
+case "$1" in
+  start)
+	  init_asound
+	;;
+  *)
+	echo "Usage: $0 {start}"
+	exit 1
+esac
+
+exit $?
+

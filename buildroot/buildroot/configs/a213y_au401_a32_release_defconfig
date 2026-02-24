@@ -1,0 +1,16 @@
+#----------------------------------------------------------#
+#include "arch_a32_7.3.1.config"
+
+#----------------------------------------------------------#
+#include "a213y_au401.config"
+#include "flash_nand_2k.config"
+
+#----------------------------------------------------------#
+#include "qt.config"
+BR2_PACKAGE_AML_QT_LAUNCHER=y
+
+#----------------------------------------------------------#
+
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesona213y_au401/initramfs/ramfslist-32-ubi-release"
+BR2_TARGET_RECOVERY_INITRAMFS_LIST="board/amlogic/mesona213y_au401/initramfs/ramfslist-32-ubi-recovery"
+

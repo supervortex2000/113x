@@ -1,0 +1,1 @@
+ACTION=="change", SUBSYSTEM=="android_usb", RUN+="/etc/rewrite_usb_udc.sh"

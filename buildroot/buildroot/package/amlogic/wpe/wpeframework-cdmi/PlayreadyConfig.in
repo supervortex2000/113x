@@ -1,0 +1,15 @@
+config BR2_PACKAGE_WPEFRAMEWORK_CDMI_PLAYREADY
+	bool "wpeframework-cdmi-playready"
+	select BR2_PACKAGE_WPEFRAMEWORK_PLUGINS
+	select BR2_PACKAGE_WPEFRAMEWORK_CDM
+	select BR2_PACKAGE_PLAYREADY
+	default n
+	bool
+
+config BR2_PACKAGE_WPEFRAMEWORK_CDMI_PLAYREADY_BUILDALL
+	bool "playready build all"
+	default n
+	help
+	  Build WPEFramework-cdmi-playready all
+
+

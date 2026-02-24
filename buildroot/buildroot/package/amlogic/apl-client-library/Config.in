@@ -1,0 +1,6 @@
+config BR2_PACKAGE_APL_CLIENT_LIBRARY
+	bool "apl client library"
+	help
+      The APL Client Library provides communication between APLViewhostWeb and apl-core-library
+
+

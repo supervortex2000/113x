@@ -1,0 +1,8 @@
+#----------------------------------------------------------#
+#include "arch_a64_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "sc2_ah212.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesonsc2_ah212/initramfs/ramfslist-64"
+
+BR2_PACKAGE_COBALT=n

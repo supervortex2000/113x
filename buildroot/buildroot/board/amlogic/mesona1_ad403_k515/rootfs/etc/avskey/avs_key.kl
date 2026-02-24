@@ -1,0 +1,12 @@
+#
+# Copyright (c) 2021 Amlogic, Inc. All rights reserved.
+# This source code is subject to the terms and conditions defined in the file 'LICENSE' which is part of this source code package.
+# Description:  avs key file
+#
+# This is map table for buildroot, use this define the key map for buildroot system
+
+# type                  key
+mute                      106
+tap                       105
+VolumeUp                  115
+VolumeDown                114

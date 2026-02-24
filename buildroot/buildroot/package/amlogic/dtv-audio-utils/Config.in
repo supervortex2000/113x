@@ -1,0 +1,7 @@
+config BR2_PACKAGE_DTV_AUDIO_UTILS
+    bool "dtv_audio_utils"
+    select BR2_PACKAGE_LIBLOG
+    select BR2_PACKAGE_LIBBINDER
+    select BR2_PACKAGE_AML_AMAUDIOUTILS
+    help
+        dtv_audio_utils

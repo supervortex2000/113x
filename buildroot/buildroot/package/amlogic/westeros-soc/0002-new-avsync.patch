@@ -1,0 +1,108 @@
+From 29a947a13d2382cfaadf2f84f309dc9a2b955039 Mon Sep 17 00:00:00 2001
+From: Song Zhao <song.zhao@amlogic.com>
+Date: Fri, 8 Jan 2021 17:49:11 -0800
+Subject: [PATCH] new avsync
+
+---
+ drm/westeros-gl/avsync/aml-meson/avsync.c | 27 +++++++++++++++++++----
+ drm/westeros-gl/westeros-gl.c             |  2 ++
+ 2 files changed, 25 insertions(+), 4 deletions(-)
+
+diff --git a/drm/westeros-gl/avsync/aml-meson/avsync.c b/drm/westeros-gl/avsync/aml-meson/avsync.c
+index 0a46a36b..7a30860f 100644
+--- a/drm/westeros-gl/avsync/aml-meson/avsync.c
++++ b/drm/westeros-gl/avsync/aml-meson/avsync.c
+@@ -21,16 +21,20 @@
+ #include "aml_avsync.h"
+ #include "aml_avsync_log.h"
+ 
++#define INVALID_SEESION_ID 16
+ 
+ static void wstAVSyncInit( VideoFrameManager *vfm, int sessionId )
+ {
+    const char *env= 0;
++   struct video_config config;
+ 
+    env= getenv("WESTEROS_GL_USE_AMLOGIC_AVSYNC");
+    if ( env )
+    {
+       int refreshRate;
+       int level;
++      int session= -1;
++
+       switch( g_activeLevel )
+       {
+          case 0:
+@@ -62,15 +66,27 @@ static void wstAVSyncInit( VideoFrameManager *vfm, int sessionId )
+       }
+       pts90K vsyncInterval= 90000LL/refreshRate;
+ 
++      if (sessionId == INVALID_SEESION_ID) {
++         session = av_sync_open_session(&sessionId);
++         if (session < 0)
++         {
++            ERROR("Failed to alloc avsync session");
++            return;
++         }
++      }
+       vfm->sync= av_sync_create( sessionId, /* session_id */
+                                  vfm->conn->syncType,
+-                                 3, /* start threshold */
+-                                 2, /* delay */
+-                                 vsyncInterval );
++                                 AV_SYNC_TYPE_VIDEO,
++                                 1/* start threshold */
++                                 );
+       if ( !vfm->sync )
+       {
+          ERROR("Failed to create vfm sync module");
+       }
++      config.delay = 2;
++      av_sync_video_config( vfm->sync, &config);
++      if (session != -1)
++         vfm->session= session;
+       DEBUG("Created sync module: %p vsyncInterval %d", vfm->sync, vsyncInterval );
+    }
+ }
+@@ -81,6 +97,10 @@ static void wstAVSyncTerm( VideoFrameManager *vfm )
+    {
+       av_sync_destroy( vfm->sync );
+       vfm->sync= 0;
++      if (vfm->session != -1) {
++         av_sync_close_session( vfm->session );
++	 vfm->session = -1;
++      }
+    }
+ }
+ 
+@@ -166,7 +186,6 @@ static VideoFrame *wstAVSyncPop( VideoFrameManager *vfm )
+          {
+             pts90K vsyncInterval= (90000LL*vfm->vblankInterval+500000LL)/1000000LL;
+             INFO("updating vblankInterval to %d (%lld us)", vsyncInterval, vfm->vblankInterval);
+-            av_sync_update_vsync_interval( vfm->sync, vsyncInterval );
+          }
+          vfm->vblankIntervalPrev= vfm->vblankInterval;
+       }
+diff --git a/drm/westeros-gl/westeros-gl.c b/drm/westeros-gl/westeros-gl.c
+index faeefbfe..506553e7 100644
+--- a/drm/westeros-gl/westeros-gl.c
++++ b/drm/westeros-gl/westeros-gl.c
+@@ -209,6 +209,7 @@ typedef struct _VideoFrameManager
+    int queueSize;
+    int queueCapacity;
+    VideoFrame *queue;
++   int session;
+    bool paused;
+    bool frameAdvance;
+    long long vblankTime;
+@@ -2729,6 +2730,7 @@ static VideoFrameManager *wstCreateVideoFrameManager( VideoServerConnection *con
+          vfm->queue[i].fd2= -1;
+          vfm->queue[i].bufferId= -1;
+       }
++      vfm->session = -1;
+    }
+ 
+ exit:
+-- 
+2.24.1
+

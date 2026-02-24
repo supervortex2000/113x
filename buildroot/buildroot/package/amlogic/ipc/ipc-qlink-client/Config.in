@@ -1,0 +1,8 @@
+config BR2_PACKAGE_IPC_QLINK_CLIENT
+	bool "ipc qlink client app"
+	select BR2_PACKAGE_IPC_PROPERTY
+	select BR2_PACKAGE_CJSON
+	select BR2_PACKAGE_OPENSSL
+	help
+	  ipc reference qlink client application
+

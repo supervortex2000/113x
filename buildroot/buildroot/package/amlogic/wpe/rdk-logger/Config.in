@@ -1,0 +1,6 @@
+menuconfig BR2_PACKAGE_RDK_LOGGER
+	bool "rdk-logger"
+	select BR2_PACKAGE_LOG4C
+	help
+	   rdk logger.
+

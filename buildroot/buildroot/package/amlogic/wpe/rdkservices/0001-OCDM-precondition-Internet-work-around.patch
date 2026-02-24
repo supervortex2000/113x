@@ -1,0 +1,12 @@
+Index: git/OpenCDMi/OCDM.config
+===================================================================
+--- git.orig/OpenCDMi/OCDM.config
++++ git/OpenCDMi/OCDM.config
+@@ -1,6 +1,6 @@
+ set (autostart ${PLUGIN_OPENCDMI_AUTOSTART})
+ 
+-set(preconditions Provisioning)
++set(preconditions Provisioning Internet Identifier)
+ 
+     if (PLUGIN_OPENCDMI_PLAYREADY_NEXUS OR PLUGIN_OPENCDMI_PLAYREADY_NEXUS_SVP OR PLUGIN_OPENCDMI_NAGRA)
+ set(preconditions ${preconditions} Platform)

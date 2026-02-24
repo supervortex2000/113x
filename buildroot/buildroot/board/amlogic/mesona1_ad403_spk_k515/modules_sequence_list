@@ -1,0 +1,67 @@
+#
+# Copyright (c) 2023 Amlogic, Inc. All rights reserved.
+# This source code is subject to the terms and conditions defined in the file 'LICENSE' which is part of this source code package.
+# Description:  modules sequence file
+#
+RAMDISK_MODULES_LOAD_LIST=(
+	amlogic-gkitool
+	amlogic-secmon
+	amlogic-clk
+	amlogic-gpio
+	amlogic-pinctrl
+	amlogic-mailbox
+	amlogic-pwm
+	pwm-regulator
+	amlogic-power
+	amlogic-cpuinfo
+	amlogic-cpufreq
+	amlogic-reset
+	amlogic-efuse-unifykey
+	amlogic-mmc
+	amlogic-spi
+	amlogic-mtd-common
+	spinand
+	amlogic-usb
+	dwc3
+	dwc3-of-simple
+	amlogic-hifidsp
+	amlogic-wireless
+)
+
+VENDOR_MODULES_LOAD_FIRST_LIST=(
+	amlogic-i2c
+	amlogic-rng
+	amlogic-crypto-dma
+	amlogic-tee
+)
+
+VENDOR_MODULES_LOAD_LAST_LIST=(
+)
+
+VENDOR_MODULES_LOAD_BLACK_LIST=(
+	phylink
+	realtek
+	mdio-mux
+	pcs_xpcs
+	amlogic-phy-debug
+	stmmac
+	stmmac-platform
+	dwmac-meson
+	dwmac-meson8b
+	dwmac-dwc-qos-eth
+	dwmac-generic
+	amlogic-input-ir
+	amlogic-rtc-virtual
+	amlogic-jtag
+	amlogic-irblaster
+	amlogic-mdio-g12a
+	amlogic-inphy
+	amlogic-snd-codec-t9015
+	amlogic-snd-codec-tlv320adc3101
+	amlogic-snd-codec-ad82584f
+)
+
+MODULES_LOAD_BLACK_LIST=(
+	${VENDOR_MODULES_LOAD_BLACK_LIST[@]}
+	${OEM_MODULES_LOAD_BLACK_LIST[@]}
+)

@@ -1,0 +1,5 @@
+menuconfig BR2_PACKAGE_HDMICEC_HEADER
+	bool "hdmicec-header"
+	help
+	   rdk hdmicec-headers.
+

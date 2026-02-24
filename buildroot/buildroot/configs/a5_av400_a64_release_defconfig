@@ -1,0 +1,15 @@
+#----------------------------------------------------------#
+#include "arch_a64_10.2_10.2.config"
+
+#----------------------------------------------------------#
+#include "a5_av400.config"
+#include "flash_emmc.config"
+### if you want to use ext fs, change to #include "rootfs_extfs.config"
+### if you want to use erofs, change to #include "rootfs_erofs.config"
+#include "rootfs_squashfs.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesona5_av400/initramfs/ramfslist-64-ext2"
+BR2_TARGET_RECOVERY_INITRAMFS_NEED_64="board/amlogic/common/ota/ota-a5/ramfslist-recovery-need-64"
+
+BR2_PACKAGE_AVS_SDK=n
+BR2_AVS_CLIENT_API=n
+BR2_PACKAGE_STRACE=n

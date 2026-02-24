@@ -1,0 +1,4 @@
+config BR2_PACKAGE_SRAF_BROWSER_SDK
+	bool  "sraf_browser_sdk"
+	help
+        Sraf_Browser

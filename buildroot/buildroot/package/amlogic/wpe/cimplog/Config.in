@@ -1,0 +1,5 @@
+menuconfig BR2_PACKAGE_CIMPLOG
+	bool "cimglog"
+	help
+	    cimplog .
+

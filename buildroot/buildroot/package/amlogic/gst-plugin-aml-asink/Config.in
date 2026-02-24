@@ -1,0 +1,15 @@
+config BR2_PACKAGE_GST_PLUGIN_AML_ASINK
+    bool "gst-plugin-aml-asink"
+    depends on BR2_PACKAGE_HAL_AUDIO_SERVICE && BR2_PACKAGE_GSTREAMER1
+    help
+        gstreamer plugin for audio HAL
+
+if BR2_PACKAGE_GST_PLUGIN_AML_ASINK
+
+  config BR2_PACKAGE_GST_PLUGIN_AML_ASINK_XRUN
+    bool "Enable xrun detection"
+    default n
+    help
+        Enable xrun detection, which can let cobalt get correct current time
+
+endif #BR2_PACKAGE_GST_PLUGIN_AML_ASINK

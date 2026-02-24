@@ -1,0 +1,5 @@
+config BR2_PACKAGE_GST_PLUGIN_AML_PICSINK
+    bool "gst-plugin-aml-picsink"
+    depends on BR2_PACKAGE_LIBIMAGEPLAYER
+    help
+        gstreamer plugin for pic decoder

@@ -1,0 +1,15 @@
+#----------------------------------------------------------#
+#include "arch_a64_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "s4_ap222.config"
+#include "flash_nand_4k.config"
+
+BR2_PACKAGE_AML_RTOS=n
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesons4_ap222/initramfs/ramfslist-64-ubi-release"
+BR2_LINUX_KERNEL_INTREE_DTS_NAME="s4_s905y4_ap222_linux-nand"
+
+# Kernel Customized Config
+BR2_PACKAGE_AML_CUSTOMIZE_KERNEL=y
+BR2_PACKAGE_AML_CUSTOMIZE_KERNEL_ENABLE_OPT_LIST="CONFIG_MTD_UBI CONFIG_UBIFS_FS"
+BR2_PACKAGE_AML_CUSTOMIZE_KERNEL_SET_OPT_LIST="CONFIG_MTD_NAND_MESON=y CONFIG_MTD_RESV_MESON=y"

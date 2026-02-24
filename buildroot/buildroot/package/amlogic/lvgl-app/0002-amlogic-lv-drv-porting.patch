@@ -1,0 +1,53 @@
+diff --git a/lv_drivers/display/fbdev.h b/lv_drivers/display/fbdev.h
+index fbbfa3f..a077204 100644
+--- a/lv_drivers/display/fbdev.h
++++ b/lv_drivers/display/fbdev.h
+@@ -17,7 +17,7 @@ extern "C" {
+ #ifdef LV_CONF_INCLUDE_SIMPLE
+ #include "lv_drv_conf.h"
+ #else
+-#include "../../lv_drv_conf.h"
++#include "../lv_drv_conf.h"
+ #endif
+ #endif
+ 
+@@ -26,7 +26,7 @@ extern "C" {
+ #ifdef LV_LVGL_H_INCLUDE_SIMPLE
+ #include "lvgl.h"
+ #else
+-#include "lvgl/lvgl.h"
++#include <lvgl/lvgl.h>
+ #endif
+ 
+ /*********************
+diff --git a/lv_drivers/lv_drv_conf_template.h b/lv_drivers/lv_drv_conf_template.h
+index 52d22ca..8749f8d 100644
+--- a/lv_drivers/lv_drv_conf_template.h
++++ b/lv_drivers/lv_drv_conf_template.h
+@@ -13,7 +13,7 @@
+ #ifndef LV_DRV_CONF_H
+ #define LV_DRV_CONF_H
+ 
+-#include "lv_conf.h"
++#include <lvgl/lv_conf.h>
+ 
+ /*********************
+  * DELAY INTERFACE
+@@ -316,7 +316,7 @@
+  *  Linux frame buffer device (/dev/fbx)
+  *-----------------------------------------*/
+ #ifndef USE_FBDEV
+-#  define USE_FBDEV           0
++#  define USE_FBDEV           1
+ #endif
+ 
+ #if USE_FBDEV
+@@ -439,7 +439,7 @@
+  * Mouse or touchpad as evdev interface (for Linux based systems)
+  *------------------------------------------------*/
+ #ifndef USE_EVDEV
+-#  define USE_EVDEV           0
++#  define USE_EVDEV           1
+ #endif
+ 
+ #ifndef USE_BSD_EVDEV

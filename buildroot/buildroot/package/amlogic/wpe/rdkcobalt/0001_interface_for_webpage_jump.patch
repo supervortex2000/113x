@@ -1,0 +1,78 @@
+diff --git a/src/cobalt/base/wrap_main_starboard.h b/src/cobalt/base/wrap_main_starboard.h
+index e92a41a83..3beeb1981 100644
+--- a/src/cobalt/base/wrap_main_starboard.h
++++ b/src/cobalt/base/wrap_main_starboard.h
+@@ -131,6 +131,7 @@ void BaseEventHandler(const SbEvent* event) {
+ #if SB_API_VERSION >= 12
+     case kSbEventTypeAccessiblityTextToSpeechSettingsChanged:
+ #endif  // SB_API_VERSION >= 12
++    case kSbEventUserPageJump:
+       event_function(event);
+       break;
+   }
+diff --git a/src/cobalt/browser/application.cc b/src/cobalt/browser/application.cc
+index 63e56d4ce..646ab31b3 100644
+--- a/src/cobalt/browser/application.cc
++++ b/src/cobalt/browser/application.cc
+@@ -1029,6 +1029,10 @@ void Application::HandleStarboardEvent(const SbEvent* starboard_event) {
+       DispatchDeepLink(static_cast<const char*>(starboard_event->data));
+       break;
+     }
++    case kSbEventUserPageJump: {
++      browser_module_->Navigate(GURL(static_cast<const char*>(starboard_event->data)));
++      break;
++    }
+     case kSbEventTypeAccessiblitySettingsChanged:
+       DispatchEventInternal(new base::AccessibilitySettingsChangedEvent());
+ #if SB_API_VERSION < 12
+@@ -1156,6 +1160,7 @@ void Application::OnApplicationEvent(SbEventType event_type) {
+     case kSbEventTypeScheduled:
+     case kSbEventTypeUser:
+     case kSbEventTypeVerticalSync:
++    case kSbEventUserPageJump:
+       NOTREACHED() << "Unexpected event type: " << event_type;
+       return;
+   }
+diff --git a/src/starboard/event.h b/src/starboard/event.h
+index 418d466a5..3a140dcff 100644
+--- a/src/starboard/event.h
++++ b/src/starboard/event.h
+@@ -285,6 +285,7 @@ typedef enum SbEventType {
+   // The platform's text-to-speech settings have changed.
+   kSbEventTypeAccessiblityTextToSpeechSettingsChanged,
+ #endif  // SB_API_VERSION >= 12
++  kSbEventUserPageJump,
+ } SbEventType;
+ 
+ // Structure representing a Starboard event and its data.
+diff --git a/src/starboard/shared/starboard/application.cc b/src/starboard/shared/starboard/application.cc
+index fcf8612a1..9b36b15c2 100644
+--- a/src/starboard/shared/starboard/application.cc
++++ b/src/starboard/shared/starboard/application.cc
+@@ -153,6 +153,12 @@ void Application::Link(const char *link_data) {
+                    SbMemoryDeallocate));
+ }
+ 
++void Application::UserPageJump(const char *link_data) {
++  SB_DCHECK(link_data) << "You must call UserPageJump with link_data.";
++  Inject(new Event(kSbEventUserPageJump, SbStringDuplicate(link_data),
++                   SbMemoryDeallocate));
++}
++
+ void Application::InjectLowMemoryEvent() {
+   Inject(new Event(kSbEventTypeLowMemory, NULL, NULL));
+ }
+diff --git a/src/starboard/shared/starboard/application.h b/src/starboard/shared/starboard/application.h
+index abb3c3755..be1354cc5 100644
+--- a/src/starboard/shared/starboard/application.h
++++ b/src/starboard/shared/starboard/application.h
+@@ -222,7 +222,8 @@ class Application {
+   // has to live over the lifetime of the call to Link. May be called from an
+   // external thread.
+   void Link(const char* link_data);
+-
++  // Injects a page jump event to the application with the given |link_data|,
++  void UserPageJump(const char* link_data);
+   // Injects an event of type kSbEventTypeLowMemory to the application.
+   void InjectLowMemoryEvent();
+ 

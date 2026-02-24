@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+
+load_eq_drc_file=/usr/bin/load_eq_drc
+eq_drc_config_file=/etc/eq_drc_params.ini
+amp_ext_file=/etc/EXT_AMP.ini
+
+function load_params(){
+
+    $load_eq_drc_file $eq_drc_config_file $amp_ext_file
+
+}
+
+case "$1" in
+  start)
+        load_params &
+        ;;
+  *)
+        echo "Usage: $0 {start}"
+        exit 1
+esac
+
+exit $?
+

@@ -1,0 +1,24 @@
+menuconfig BR2_PACKAGE_AML_COMMONLIB
+	bool "amlogic common library"
+	help
+	  aml common library
+
+if BR2_PACKAGE_AML_COMMONLIB
+
+config BR2_PACKAGE_AML_LOG
+	bool "aml log library"
+	default n
+	help
+	  enable aml log library
+
+config BR2_PACKAGE_AML_SOCKETIPC
+	bool "aml socket ipc library"
+	default n
+	help
+	  enable aml socket ipc library
+
+config BR2_PACKAGE_AML_AUDIO_CLOCK_SYNC
+	bool "aml_audio_clock_sync"
+	help
+		Fine tune MCLK to change the soft locker diff value to prevent underrun
+endif

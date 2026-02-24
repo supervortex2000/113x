@@ -1,0 +1,37 @@
+From 2734b67c86270b5d5769304f31bfd9e03b9fa2c4 Mon Sep 17 00:00:00 2001
+From: Bing Jiang <bing.jiang@amlogic.com>
+Date: Fri, 18 Dec 2020 11:05:21 +0800
+Subject: [PATCH] not map remote key to rdkshell key
+
+---
+ linuxkeys.cpp | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/linuxkeys.cpp b/linuxkeys.cpp
+index 79133f0..5362f46 100644
+--- a/linuxkeys.cpp
++++ b/linuxkeys.cpp
+@@ -150,6 +150,11 @@ bool keyCodeFromWayland(uint32_t waylandKeyCode, uint32_t waylandFlags, uint32_t
+       mappedFlags = it->second.flags;
+       return true;
+     }
++
++    mappedKeyCode = waylandKeyCode;
++    mappedFlags = waylandFlags;
++    return true;
++
+     int standardKeyCode = 0;
+     switch (waylandKeyCode)
+     {
+@@ -512,6 +517,8 @@ uint32_t keyCodeToWayland(uint32_t keyCode)
+ {
+     uint32_t  waylandKeyCode = 0;
+ 
++    return keyCode;
++
+    switch( keyCode )
+    {
+       case RDKSHELL_KEY_BACKSPACE:
+-- 
+2.26.1
+

@@ -1,0 +1,12 @@
+diff --git a/Source/interfaces/IBrowser.h b/Source/interfaces/IBrowser.h
+index fb5835b..a4951ba 100644
+--- a/Source/interfaces/IBrowser.h
++++ b/Source/interfaces/IBrowser.h
+@@ -50,6 +50,7 @@ namespace Exchange {
+ 
+         virtual void Hide(const bool hidden) = 0;
+         virtual void SetENV(const string &env,const string &value) = 0;
++        virtual void SetUserPageJump(const string& URL) = 0;
+     };
+ 
+     /* @json */

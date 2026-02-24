@@ -1,0 +1,28 @@
+diff --git a/DIALServer/DIALServer.cpp b/DIALServer/DIALServer.cpp
+index 7b35f54..a6faa13 100644
+--- a/DIALServer/DIALServer.cpp
++++ b/DIALServer/DIALServer.cpp
+@@ -686,6 +686,7 @@ namespace Plugin {
+                         StopApplication(request, result, selectedApp->second);
+                     } else if (request.Verb == Web::Request::HTTP_POST) {
+                         if (index.Next() == true && index.Current() == kHideCommand) {
++#if 0 //skyworth project don't support
+                             if (selectedApp->second.IsRunning() == true) {
+                                 if (selectedApp->second.HasHideAndShow() == true) {
+                                     result->ErrorCode = Web::STATUS_OK;
+@@ -699,6 +700,15 @@ namespace Plugin {
+                                 result->ErrorCode = Web::STATUS_NOT_FOUND;
+                                 result->Message = _T("App not running");
+                             }
++#else
++                            if (selectedApp->second.IsRunning() == true) {
++                                    result->ErrorCode = Web::STATUS_NOT_IMPLEMENTED;
++                                    result->Message = _T("Not Implemented");
++                            } else {
++                                result->ErrorCode = Web::STATUS_NOT_FOUND;
++                                result->Message = _T("App not running");
++                            }
++#endif
+                         } else {
+                             StartApplication(request, result, selectedApp->second);
+                         }

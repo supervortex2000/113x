@@ -1,0 +1,190 @@
+From 2a4df48702579f423a6a2ea68ca80828e55f28c9 Mon Sep 17 00:00:00 2001
+From: Song Zhao <song.zhao@amlogic.com>
+Date: Tue, 16 Mar 2021 22:22:18 -0700
+Subject: [PATCH] support pip
+
+---
+ drm/westeros-gl/westeros-gl.c | 120 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 117 insertions(+), 3 deletions(-)
+
+diff --git a/drm/westeros-gl/westeros-gl.c b/drm/westeros-gl/westeros-gl.c
+index 8ef7fb25..9c1dd5d0 100644
+--- a/drm/westeros-gl/westeros-gl.c
++++ b/drm/westeros-gl/westeros-gl.c
+@@ -250,6 +250,7 @@ typedef struct _WstOverlayPlane
+    struct _WstOverlayPlane *prev;
+    bool inUse;
+    bool supportsVideo;
++   bool pipVideo;
+    bool supportsGraphics;
+    bool frameRateMatchingPlane;
+    int zOrder;
+@@ -718,6 +719,65 @@ static WstOverlayPlane *wstOverlayAllocPrimary( WstOverlayPlanes *planes )
+    return overlay;
+ }
+ 
++static WstOverlayPlane *wstOverlayAllocPipVideo( WstOverlayPlanes *planes )
++{
++   WstOverlayPlane *overlay= NULL;
++   WstOverlayPlane *cur= NULL;
++
++   pthread_mutex_lock( &gCtx->mutex );
++
++   if ( planes->usedCount < planes->totalCount )
++   {
++
++      cur= planes->availHead;
++      while (cur) {
++         if ( cur->pipVideo ) {
++            overlay= cur;
++            break;
++         }
++         cur = cur->next;
++      }
++
++      if ( !overlay )
++          goto exit;
++
++      if ( planes->availHead == overlay )
++      {
++         planes->availHead= cur->next;
++         planes->availHead->prev= NULL;
++      }
++      if ( !planes->availHead )
++      {
++         planes->availTail= NULL;
++      }
++
++      if ( overlay->next )
++          overlay->next->prev = overlay->prev;
++      if ( overlay->prev )
++          overlay->prev->next = overlay->next;
++
++      ++planes->usedCount;
++      overlay->next= 0;
++      overlay->prev= planes->usedTail;
++      if ( planes->usedTail )
++      {
++         planes->usedTail->next= overlay;
++      }
++      else
++      {
++         planes->usedHead= overlay;
++      }
++      planes->usedTail= overlay;
++      overlay->inUse= true;
++   }
++
++exit:
++   pthread_mutex_unlock( &gCtx->mutex );
++
++   return overlay;
++}
++
++
+ static WstOverlayPlane *wstOverlayAlloc( WstOverlayPlanes *planes, bool graphics )
+ {
+    WstOverlayPlane *overlay= 0;
+@@ -1229,13 +1289,50 @@ static void *wstVideoServerConnectionThread( void *arg )
+    int stride0, stride1, stride2;
+    int bufferId= 0;
+    int bufferIdRel;
++   bool isPipVideo = 0;
+    long long frameTime= 0;
+    VideoFrame videoFrame;
+ 
+    DEBUG("wstVideoServerConnectionThread: enter");
+ 
+-   conn->videoPlane= wstOverlayAlloc( &gCtx->overlayPlanes, false );
+-   INFO("video plane %p : zorder: %d", conn->videoPlane, (conn->videoPlane ? conn->videoPlane->zOrder: -1) );
++
++   /* video layer*/
++   iov[0].iov_base= (char*)mbody;
++   iov[0].iov_len= 5;
++
++   cmsg= (struct cmsghdr*)cmbody;
++   cmsg->cmsg_len= CMSG_LEN(3*sizeof(int));
++   cmsg->cmsg_level= SOL_SOCKET;
++   cmsg->cmsg_type= SCM_RIGHTS;
++
++   msg.msg_name= NULL;
++   msg.msg_namelen= 0;
++   msg.msg_iov= iov;
++   msg.msg_iovlen= 1;
++   msg.msg_control= cmsg;
++   msg.msg_controllen= cmsg->cmsg_len;
++   msg.msg_flags= 0;
++
++   do
++   {
++      len= recvmsg( conn->socketFd, &msg, 0 );
++   }
++   while ( (len < 0) && (errno == EINTR));
++   if ( len == 5 )
++   {
++      unsigned char *m= mbody;
++      if ( (m[0] == 'V') && (m[1] == 'S') && (m[2] == 2) && (m[3] == 'N'))
++      {
++         isPipVideo= m[4];
++      }
++   }
++
++   if ( isPipVideo )
++      conn->videoPlane= wstOverlayAllocPipVideo( &gCtx->overlayPlanes );
++   else
++      conn->videoPlane= wstOverlayAlloc( &gCtx->overlayPlanes, false );
++
++   INFO("video plane %p : zorder: %d pip: %d", conn->videoPlane, (conn->videoPlane ? conn->videoPlane->zOrder: -1), isPipVideo );
+ 
+    if ( !conn->videoPlane )
+    {
+@@ -3699,6 +3796,7 @@ static WstGLCtx *wstInitCtx( void )
+       if ( ctx->usePlanes && (crtc_idx >= 0) )
+       {
+          bool haveVideoPlanes= false;
++         bool haveMainVideoPlane= false;
+ 
+          planeRes= drmModeGetPlaneResources( ctx->drmFd );
+          if ( planeRes )
+@@ -3791,6 +3889,16 @@ static WstGLCtx *wstInitCtx( void )
+                         ++ctx->overlayPlanes.totalCount;
+                         newPlane->plane= plane;
+                         newPlane->supportsVideo= isVideo;
++                        if ( isVideo ) {
++                           if (!haveMainVideoPlane) {
++                              newPlane->pipVideo= false;
++                              haveMainVideoPlane= true;
++                           } else {
++                              newPlane->pipVideo= true;
++                           }
++                        } else {
++                           newPlane->pipVideo= false;
++                        }
+                         newPlane->supportsGraphics= isGraphics;
+                         newPlane->zOrder= n + zpos*16+((isVideo && !isGraphics) ? 0 : 256);
+                         newPlane->inUse= false;
+@@ -3802,7 +3910,7 @@ static WstGLCtx *wstInitCtx( void )
+                            newPlane->videoFrame[i].fd2= -1;
+                            newPlane->videoFrame[i].bufferId= -1;
+                         }
+-                        TRACE3("plane zorder %d primary %d overlay %d video %d gfx %d crtc_id %d",
++                        INFO("plane zorder %d primary %d overlay %d video %d gfx %d crtc_id %d",
+                                newPlane->zOrder, isPrimary, isOverlay, isVideo, isGraphics, newPlane->crtc_id);
+                         if ( ctx->haveAtomic )
+                         {
+@@ -5075,6 +5183,12 @@ static void wstSwapDRMBuffersAtomic( WstGLCtx *ctx )
+                                         iter->planeProps->count_props, iter->planePropRes,
+                                         "IN_FENCE_FD", -1 );
+ 
++                  if (iter->zOrder > 63)
++                    iter->zOrder = 1;
++                  wstAtomicAddProperty( ctx, req, iter->plane->plane_id,
++                                        iter->planeProps->count_props, iter->planePropRes,
++                                        "zpos", iter->zOrder+1 );
++
+                   FRAME("commit frame %d buffer %d", iter->videoFrame[FRAME_CURR].frameNumber, iter->videoFrame[FRAME_CURR].bufferId);
+                   avProgLog( iter->videoFrame[FRAME_CURR].frameTime*1000LL, 0, "WtoD", "");
+                }
+-- 
+2.24.1
+

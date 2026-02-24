@@ -1,0 +1,384 @@
+From 0f3e4ab9c943b177957824fc833bc3187b120b96 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Thu, 1 Jul 2021 14:29:59 +0800
+Subject: [PATCH] Add more protect in WebSerialize.cpp avoid wpe crash when
+ deactivate dial
+
+Change-Id: I7873207d15c04f6931361dab74eb029ee93c1217
+---
+ Source/WPEFramework/Controller.cpp |  6 ++++--
+ Source/com/Messages.h              |  1 +
+ Source/core/ASN1.h                 |  1 +
+ Source/core/Frame.h                |  9 ++++++--
+ Source/core/IPCConnector.h         |  7 +++---
+ Source/core/JSON.h                 | 34 +++++++++++++++++++++++-------
+ Source/core/SocketPort.cpp         | 20 ++++++++++--------
+ Source/websocket/WebLink.h         |  1 +
+ Source/websocket/WebRequest.h      |  7 +++++-
+ Source/websocket/WebResponse.h     |  2 ++
+ Source/websocket/WebSerializer.cpp |  4 ++++
+ Source/websocket/WebSocketLink.h   |  3 ++-
+ 12 files changed, 69 insertions(+), 26 deletions(-)
+
+diff --git a/Source/WPEFramework/Controller.cpp b/Source/WPEFramework/Controller.cpp
+index c97c2fe5..debc7076 100644
+--- a/Source/WPEFramework/Controller.cpp
++++ b/Source/WPEFramework/Controller.cpp
+@@ -132,11 +132,12 @@ namespace Plugin {
+             Core::TextSegmentIterator index(Core::TextFragment(request.Path, _skipURL, static_cast<uint32_t>(request.Path.length()) - _skipURL), false, '/');
+ 
+             // Always skip the first one, it is an empty part because we start with a '/' if there are more parameters.
+-            index.Next();
++            if (index.Next() == true) {
+ 
+             if ( (index.Next() == true) && (index.Current() == _T("Configuration")) ) {
+                 request.Body(Core::proxy_cast<Web::IBody>(jsonBodyTextFactory.Element()));
+             }
++            }
+         }
+     }
+ 
+@@ -150,7 +151,7 @@ namespace Plugin {
+         Core::TextSegmentIterator index(Core::TextFragment(request.Path, _skipURL, static_cast<uint32_t>(request.Path.length()) - _skipURL), false, '/');
+ 
+         // Always skip the first one, it is an empty part because we start with a '/' if there are more parameters.
+-        index.Next();
++        if (index.Next() == true) {
+ 
+         // For now, whatever the URL, we will just, on a get, drop all info we have
+         if (request.Verb == Web::Request::HTTP_POST) {
+@@ -165,6 +166,7 @@ namespace Plugin {
+             // Time to remove a plugin, indicated by Current.
+             result = DeleteMethod(index, request);
+         }
++        }
+ 
+         return (result);
+     }
+diff --git a/Source/com/Messages.h b/Source/com/Messages.h
+index 18e743d6..70d5960c 100644
+--- a/Source/com/Messages.h
++++ b/Source/com/Messages.h
+@@ -230,6 +230,7 @@ namespace RPC {
+                 , _exchangeId(~0)
+                 , _versionId(0)
+             {
++                _className[0] = '\0';
+             }
+             ~Init()
+             {
+diff --git a/Source/core/ASN1.h b/Source/core/ASN1.h
+index db6ed6d6..f8fd7044 100644
+--- a/Source/core/ASN1.h
++++ b/Source/core/ASN1.h
+@@ -227,6 +227,7 @@ namespace Core {
+             OID(const string& OID)
+                 : _length(0)
+             {
++                _buffer[0] = 0;
+                 uint16_t firstSet = ~0;
+                 uint16_t index = 0;
+                 uint32_t value = 0;
+diff --git a/Source/core/Frame.h b/Source/core/Frame.h
+index 06ef0664..03545077 100644
+--- a/Source/core/Frame.h
++++ b/Source/core/Frame.h
+@@ -86,10 +86,15 @@ namespace Core {
+             {
+                 if (requiredSize > _bufferSize) {
+ 
+-                    _bufferSize = static_cast<uint16_t>(((requiredSize / (STARTSIZE ? STARTSIZE : 1)) + 1) * STARTSIZE);
++                    uint16_t bufferSize = static_cast<uint16_t>(((requiredSize / (STARTSIZE ? STARTSIZE : 1)) + 1) * STARTSIZE);
+ 
+                     // oops we need to "reallocate".
+-                    _data = reinterpret_cast<uint8_t*>(::realloc(_data, _bufferSize));
++                    uint8_t* data = reinterpret_cast<uint8_t*>(::realloc(_data, bufferSize));
++
++                    if (data != nullptr) {
++                        _data = data;
++                        _bufferSize = bufferSize;
++                    }
+                 }
+             }
+             inline void RealAllocate(const uint32_t requiredSize, const TemplateIntToType<0>& /* For compile time diffrentiation */)
+diff --git a/Source/core/IPCConnector.h b/Source/core/IPCConnector.h
+index 7f92d8ae..3a8cbdcd 100644
+--- a/Source/core/IPCConnector.h
++++ b/Source/core/IPCConnector.h
+@@ -40,13 +40,14 @@ namespace Core {
+         typedef uint32_t Identifier;
+ 
+         class Serializer {
+-        private:
++        public:
+             Serializer(const Serializer&);
+             Serializer& operator=(const Serializer&);
+ 
+-        public:
+             Serializer()
+-                : _current(nullptr)
++                : _length(0)
++                , _offset(0)
++                ,_current(nullptr)
+             {
+             }
+             virtual ~Serializer()
+diff --git a/Source/core/JSON.h b/Source/core/JSON.h
+index 3f72cae4..28f75cf3 100644
+--- a/Source/core/JSON.h
++++ b/Source/core/JSON.h
+@@ -2150,10 +2150,18 @@ namespace Core {
+ 
+                             // See if we can still add a character
+                             if (_index == _maxLength) {
+-                                _maxLength = (2 * _maxLength);
+-                                _buffer = reinterpret_cast<uint8_t*>(::realloc(_buffer, _maxLength));
++                                uint16_t maxLength = (2 * _maxLength);
++                                uint8_t* newBuffer = reinterpret_cast<uint8_t*>(::realloc(_buffer, maxLength));
++                                if (newBuffer != nullptr) {
++                                    _buffer = newBuffer;
++                                    _maxLength = maxLength;
++                                }
+                             }
+ 
++                            if (_index >= _maxLength) {
++                                TRACE_L1("Out of memory !!!!");
++                            } else {
++
+                             if (_state == 0) {
+                                 _lastStuff = converted << 2;
+                                 _state = 1;
+@@ -2169,15 +2177,25 @@ namespace Core {
+                                 _buffer[_index++] = ((converted & 0x3F) | _lastStuff);
+                                 _state = 0;
+                             }
++                            }
+                         }
+ 
+                         if (((_state & SET) == SET) && ((_state & 0xF) != 0)) {
+ 
+                             if (_index == _maxLength) {
+-                                _maxLength = _maxLength + 0xFF;
+-                                _buffer = reinterpret_cast<uint8_t*>(::realloc(_buffer, _maxLength));
++                                uint16_t maxLength = (_maxLength + 0xFF);
++                                uint8_t* newBuffer = reinterpret_cast<uint8_t*>(::realloc(_buffer, maxLength));
++                                if (newBuffer != nullptr) {
++                                    _buffer = newBuffer;
++                                    _maxLength = maxLength;
++                                }
++                            }
++                            if (_index < _maxLength) {
++                                _buffer[_index++] = _lastStuff;
++                            }
++                            else {
++                                TRACE_L1("Out of Memory!!!!");
+                             }
+-                            _buffer[_index++] = _lastStuff;
+                         }
+                     }
+                 }
+@@ -3109,15 +3127,15 @@ namespace Core {
+ 
+             Container()
+                 : _state(0)
++                , _count(0)
+                 , _data()
+                 , _iterator()
+                 , _fieldName(true)
+             {
++                ::memset(&_current, 0, sizeof(_current));
+             }
+ 
+-            ~Container() override
+-            {
+-            }
++            ~Container() override = default;
+ 
+         public:
+             bool HasLabel(const string& label) const
+diff --git a/Source/core/SocketPort.cpp b/Source/core/SocketPort.cpp
+index 58b5b920..b92cd61a 100644
+--- a/Source/core/SocketPort.cpp
++++ b/Source/core/SocketPort.cpp
+@@ -242,8 +242,8 @@ namespace Core {
+         // Make sure the socket is closed before you destruct. Otherwise
+         // the virtuals might be called, which are destructed at this point !!!!
+         ASSERT(m_Socket == INVALID_SOCKET);
+-
+-        ::free(m_SendBuffer);
++        if (m_SendBuffer != nullptr)
++          ::free(m_SendBuffer);
+     }
+ 
+     //////////////////////////////////////////////////////////////////////
+@@ -464,9 +464,10 @@ namespace Core {
+         uint32_t sendBuffer = m_SendBufferSize;
+ 
+         if (m_ReceiveBufferSize == static_cast<uint16_t>(~0)) {
+-            ::getsockopt(socket, SOL_SOCKET, SO_RCVBUF, (char*)&value, &valueLength);
+-
+-            receiveBuffer = static_cast<uint32_t>(value);
++            if (SOCKET_ERROR == ::getsockopt(socket, SOL_SOCKET, SO_RCVBUF, (char*)&value, &valueLength))
++                receiveBuffer = 0;
++            else
++                receiveBuffer = static_cast<uint32_t>(value);
+ 
+             TRACE_L1("Receive buffer size. %d", receiveBuffer);
+         } else if ((receiveBuffer != 0) && (::setsockopt(socket, SOL_SOCKET, SO_RCVBUF, (const char*)&receiveBuffer, sizeof(receiveBuffer)) == SOCKET_ERROR)) {
+@@ -474,9 +475,10 @@ namespace Core {
+         }
+ 
+         if (m_SendBufferSize == static_cast<uint16_t>(~0)) {
+-            ::getsockopt(socket, SOL_SOCKET, SO_SNDBUF, (char*)&value, &valueLength);
+-
+-            sendBuffer = static_cast<uint32_t>(value);
++            if (SOCKET_ERROR == ::getsockopt(socket, SOL_SOCKET, SO_SNDBUF, (char*)&value, &valueLength))
++                sendBuffer = 0;
++            else 
++                sendBuffer = static_cast<uint32_t>(value);
+ 
+             TRACE_L1("Send buffer size. %d", sendBuffer);
+         } else if ((sendBuffer != 0) && (::setsockopt(socket, SOL_SOCKET, SO_SNDBUF, (const char*)&sendBuffer, sizeof(sendBuffer)) == SOCKET_ERROR)) {
+@@ -555,7 +557,7 @@ namespace Core {
+         if ((l_Result != INVALID_SOCKET) && (specificInterface.empty() == false)) {
+ 
+             struct ifreq interface;
+-            strncpy(interface.ifr_ifrn.ifrn_name, specificInterface.c_str(), IFNAMSIZ);
++            strncpy(interface.ifr_ifrn.ifrn_name, specificInterface.c_str(), IFNAMSIZ-1);
+ 
+             if (::setsockopt(l_Result, SOL_SOCKET, SO_BINDTODEVICE, (const char*)&interface, sizeof(interface)) < 0) {
+ 
+diff --git a/Source/websocket/WebLink.h b/Source/websocket/WebLink.h
+index a50948c1..b7aaa5c6 100644
+--- a/Source/websocket/WebLink.h
++++ b/Source/websocket/WebLink.h
+@@ -168,6 +168,7 @@ namespace Web {
+             template <typename... Args>
+             HandlerType(PARENTCLASS& parent, Args&&... args)
+                 : ACTUALLINK(std::forward<Args>(args)...)
++                , _activity(true)
+                 , _parent(parent)
+             {
+             }
+diff --git a/Source/websocket/WebRequest.h b/Source/websocket/WebRequest.h
+index cd6ab0b7..6dad3952 100644
+--- a/Source/websocket/WebRequest.h
++++ b/Source/websocket/WebRequest.h
+@@ -102,6 +102,7 @@ namespace Web {
+         Signature()
+             : _type(Crypto::HASH_MD5)
+         {
++            ::memset(_hashValue, 0, sizeof(_hashValue));
+         }
+         Signature(const Crypto::EnumHashType& type, const uint8_t hash[])
+             : _type(type)
+@@ -292,15 +293,16 @@ namespace Web {
+             };
+             const static uint16_t EOL_MARKER = 0x8000;
+ 
++        public:
+             Serializer(const Serializer&) = delete;
+             Serializer& operator=(const Serializer&) = delete;
+ 
+-        public:
+             Serializer()
+                 : _state(VERB)
+                 , _offset(0)
+                 , _keyIndex(0)
+                 , _value()
++                , _bodyLength(0)
+                 , _buffer(nullptr)
+                 , _lock()
+                 , _current()
+@@ -373,7 +375,10 @@ namespace Web {
+                 : _lock()
+                 , _current()
+                 , _state(VERB)
++                , _keyWord(Web::Request::keywords::WEBSOCKET_VERSION)
+                 , _parser(*this)
++                , _zlib()
++                , _zlibResult(0)
+             {
+             }
+ #ifdef __WINDOWS__
+diff --git a/Source/websocket/WebResponse.h b/Source/websocket/WebResponse.h
+index a9fde5cf..e8ae07eb 100644
+--- a/Source/websocket/WebResponse.h
++++ b/Source/websocket/WebResponse.h
+@@ -139,6 +139,7 @@ namespace Web {
+                 , _offset(0)
+                 , _keyIndex(0)
+                 , _value()
++                , _bodyLength(0)
+                 , _buffer(nullptr)
+                 , _lock()
+                 , _current()
+@@ -211,6 +212,7 @@ namespace Web {
+                 : _lock()
+                 , _current()
+                 , _state(VERSION)
++                , _keyWord(Web::Response::keywords::SERVER)
+                 , _parser(*this)
+                 , _zlib()
+ 				, _zlibResult(0)
+diff --git a/Source/websocket/WebSerializer.cpp b/Source/websocket/WebSerializer.cpp
+index 904f5fd8..36aba420 100644
+--- a/Source/websocket/WebSerializer.cpp
++++ b/Source/websocket/WebSerializer.cpp
+@@ -1594,6 +1594,7 @@ namespace Web
+ 
+     void Request::Deserializer::EndOfPassThrough()
+     {
++        _lock.Lock();
+         // Check if we are onchunked mode
+         if ((_current->TransferEncoding.IsSet() == true) && (_current->TransferEncoding.Value() == TRANSFER_CHUNKED)) {
+             _state = CHUNK_END;
+@@ -1615,10 +1616,12 @@ namespace Web
+             _parser.CollectWord(Parser::UPPERCASE);
+             _state = VERB;
+         }
++        _lock.Unlock();
+     }
+ 
+     void Request::Deserializer::EndOfLine()
+     {
++        _lock.Lock();
+         switch (_state) {
+         case VERB:
+         case URL:
+@@ -1663,6 +1666,7 @@ namespace Web
+             ASSERT(false);
+         }
+         }
++        _lock.Unlock(); 
+     }
+ 
+     uint16_t Response::Deserializer::Parse(const uint8_t stream[], const uint16_t maxLength)
+diff --git a/Source/websocket/WebSocketLink.h b/Source/websocket/WebSocketLink.h
+index af3f6bc1..59e9438d 100644
+--- a/Source/websocket/WebSocketLink.h
++++ b/Source/websocket/WebSocketLink.h
+@@ -49,11 +49,11 @@ namespace Web {
+                 CLOSE_INPROGRESS = 0x08
+             };
+ 
++        public:
+             Protocol() = delete;
+             Protocol(const Protocol&) = delete;
+             Protocol& operator=(const Protocol&) = delete;
+ 
+-        public:
+             Protocol(const bool binary, const bool masking)
+                 : _setFlags((masking ? 0x80 : 0x00) | (binary ? 0x02 : 0x01))
+                 , _progressInfo(0)
+@@ -61,6 +61,7 @@ namespace Web {
+                 , _frameType(TEXT)
+                 , _controlStatus(0)
+             {
++                ::memset(_scrambleKey, 0, sizeof(_scrambleKey));
+             }
+             ~Protocol()
+             {
+-- 
+2.31.0
+

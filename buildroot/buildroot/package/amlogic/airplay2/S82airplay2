@@ -1,0 +1,43 @@
+#! /bin/sh
+if [ -f /etc/init.d/get_sysname.sh ]; then
+device_name=$(/etc/init.d/get_sysname.sh)
+else
+device_name="aml_speaker"
+fi
+
+Amlogic_dt_id="/proc/device-tree/amlogic-dt-id" 
+OPTIONS=""
+
+if cat $Amlogic_dt_id | grep "a4_a113l2_ba400"; then
+	OPTIONS="-D hw:0,1 -n "$device_name" --udp-control-port 20000 -b /dev/i2c-3 --ipc-client /tmp/homeapp_airplay"
+elif cat $Amlogic_dt_id | grep "a5_a113x2_av400_1g"; then
+	OPTIONS="-D dmixer_avs_auto -n "$device_name" --udp-control-port 20000 -b /dev/i2c-3 --ipc-client /tmp/homeapp_airplay --enable-res-management 1"
+else
+	OPTIONS="-D hw:0,2 --udp-control-port 20000"
+fi
+
+NAME=airplaydemo
+DAEMON=/usr/bin/$NAME
+PIDFILE=/var/run/$NAME.pid
+
+case "$1" in
+    start)
+	printf "Starting AirPlay ... "
+	start-stop-daemon -b -S -q -m -p $PIDFILE --exec $DAEMON -- $OPTIONS
+	[ $? = 0 ] && echo "OK" || echo "FAIL"
+	;;
+    stop)
+	printf "Stopping AirPlay ... "
+	start-stop-daemon -K -q -p $PIDFILE
+	[ $? = 0 ] && echo "OK" || echo "FAIL"
+	;;
+    netready|netup|netdown|netchange) ;;
+    restart)
+	$0 stop
+	$0 start
+	;;
+    *)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+	;;
+esac

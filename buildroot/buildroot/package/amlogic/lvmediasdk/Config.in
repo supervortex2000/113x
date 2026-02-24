@@ -1,0 +1,4 @@
+config BR2_PACKAGE_LVMEDIASDK
+    bool "lvmediasdk"
+    help
+        lvmediasdk

@@ -1,0 +1,9 @@
+config BR2_PACKAGE_LVGL_APP
+    bool "lvgl app"
+    help
+      Use lvgl to build GUI application.
+config BR2_PACKAGE_LVGL_DEMOS
+    bool "lvgl demos"
+    select BR2_PACKAGE_LVGL_APP
+    help
+      Enable lvgl demos.

@@ -1,0 +1,29 @@
+#
+# Copyright (c) 2014 Amlogic, Inc. All rights reserved.
+# This source code is subject to the terms and conditions defined in the file 'LICENSE' which is part of this source code package.
+# Description: Config file
+#
+
+config BR2_PACKAGE_AML_ARM_RTOS_SDK
+    bool "AML ARM RTOS SDK"
+    help
+      Amlogic ARM RTOS SDK
+      New Architecture
+
+config BR2_PACKAGE_AML_ARM_RTOS_SDK_LOCAL_PATH
+    string "amlogic arm RTOS SDK local path"
+    depends on BR2_PACKAGE_AML_ARM_RTOS_SDK
+    help
+      aml arm rtos sdk local path
+
+config BR2_PACKAGE_AML_ARM_RTOS_SDK_PREBUILT_PATH
+    string "amlogic ARM RTOS SDK prebuilt path"
+    depends on BR2_PACKAGE_AML_ARM_RTOS_SDK
+    help
+      aml arm rtos sdk prebuilt path
+
+config BR2_PACKAGE_AML_ARM_RTOS_SDK_BUILD_OPTION
+    string "AML ARM RTOS SDK DSPA build option"
+    depends on BR2_PACKAGE_AML_ARM_RTOS_SDK
+    help
+      AML ARM RTOS SDK build option

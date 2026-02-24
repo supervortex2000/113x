@@ -1,0 +1,63 @@
+From f2028dafcfbd1eeb7b8d23047e0829ad99548af4 Mon Sep 17 00:00:00 2001
+From: Song Zhao <song.zhao@amlogic.com>
+Date: Mon, 22 Mar 2021 17:59:08 -0700
+Subject: [PATCH 2/3] add frames dropped property for cobalt
+
+---
+ westeros-sink/v4l2/westeros-sink-soc.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/westeros-sink/v4l2/westeros-sink-soc.c b/westeros-sink/v4l2/westeros-sink-soc.c
+index 5779045f..48965130 100644
+--- a/westeros-sink/v4l2/westeros-sink-soc.c
++++ b/westeros-sink/v4l2/westeros-sink-soc.c
+@@ -78,6 +78,7 @@ enum
+   PROP_DEVICE= PROP_SOC_BASE,
+   PROP_PIP_VIDEO,
+   PROP_VIDEO_PLANE_SWITCH,
++  PROP_VIDEO_FRAME_DROP_NUM,
+   PROP_FRAME_STEP_ON_PREROLL,
+   PROP_LOW_MEMORY_MODE,
+   PROP_FORCE_ASPECT_RATIO,
+@@ -292,6 +293,11 @@ void gst_westeros_sink_soc_class_init(GstWesterosSinkClass *klass)
+            "video picture in picture",
+            FALSE, G_PARAM_WRITABLE));
+ 
++   g_object_class_install_property (G_OBJECT_CLASS (klass), PROP_VIDEO_FRAME_DROP_NUM,
++       g_param_spec_int ("frames-dropped", "frames-dropped",
++           "number of dropped frames",
++           0, G_MAXINT32, 0, G_PARAM_READABLE));
++
+    g_object_class_install_property (gobject_class, PROP_FRAME_STEP_ON_PREROLL,
+      g_param_spec_boolean ("frame-step-on-preroll",
+                            "frame step on preroll",
+@@ -725,6 +731,16 @@ void gst_westeros_sink_soc_set_property(GObject *object, guint prop_id, const GV
+    }
+ }
+ 
++int gst_westeros_sink_soc_get_frame_drop_num (GObject *object, gfloat rate)
++{
++   GstWesterosSink *sink = GST_WESTEROS_SINK(object);
++   GST_DEBUG("dropped %d displayed %d", sink->soc.numDropped, sink->soc.frameDisplayCount);
++   if (sink->soc.numDropped < 10)
++      return 0;
++   else
++      return sink->soc.numDropped;
++}
++
+ void gst_westeros_sink_soc_get_property(GObject *object, guint prop_id, GValue *value, GParamSpec *pspec)
+ {
+    GstWesterosSink *sink = GST_WESTEROS_SINK(object);
+@@ -736,6 +752,9 @@ void gst_westeros_sink_soc_get_property(GObject *object, guint prop_id, GValue *
+       case PROP_DEVICE:
+          g_value_set_string(value, sink->soc.devname);
+          break;
++      case PROP_VIDEO_FRAME_DROP_NUM:
++         g_value_set_int(value, gst_westeros_sink_soc_get_frame_drop_num(object, sink->playbackRate));
++         break;
+       case PROP_FRAME_STEP_ON_PREROLL:
+          g_value_set_boolean(value, sink->soc.frameStepOnPreroll);
+          break;
+-- 
+2.24.1
+

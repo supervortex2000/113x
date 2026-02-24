@@ -1,0 +1,15 @@
+#
+# Copyright (c) 2021 Amlogic, Inc. All rights reserved.
+# This source code is subject to the terms and conditions defined in the file 'LICENSE' which is part of this source code package.
+# Description:  gpio key file
+#
+# This is map table for buildroot, use this define the key map for buildroot system
+
+# type                  key    mode
+#up                      106         #this key uesd avs mute
+#down                   105
+Play                    207     0
+VolumeUp                114     1    #this key used  VolumeUp
+VolumeDown              115     1    #this key used VolumeDown
+Mute                    113     0
+power                   116     0

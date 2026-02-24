@@ -1,0 +1,124 @@
+software =
+{
+	version = "1.0.1";
+	hardware-compatibility: [ "1.0" ];
+	images: (
+		{
+			filename = "rootfs.ubifs";
+			volume = "rootfs";
+		},
+		{
+			filename = "dtb.img";
+			device = "/dev/dtb";
+		},
+		{
+			filename = "boot.img";
+			mtdname = "boot";
+			type = "flash";
+		},
+		{
+			filename = "bb1st.sto.bin.signed";
+			device = "/dev/mtd0";
+			type = "flash";
+		},
+		{
+			filename = "bb1st.sto.bin.signed";
+			device = "/dev/mtd0";
+			offset = "512K";
+			type = "flash";
+		},
+		{
+			filename = "bb1st.sto.bin.signed";
+			device = "/dev/mtd0";
+			offset = "1024K";
+			type = "flash";
+		},
+		{
+			filename = "bb1st.sto.bin.signed";
+			device = "/dev/mtd0";
+			offset = "1536K";
+			type = "flash";
+		},
+		{
+			filename = "blob-bl2e.sto.bin.signed";
+			device = "/dev/mtd1";
+			type = "flash";
+		},
+		{
+			filename = "blob-bl2e.sto.bin.signed";
+			device = "/dev/mtd1";
+			offset = "128K";
+			type = "flash";
+		},
+		{
+			filename = "blob-bl2e.sto.bin.signed";
+			device = "/dev/mtd1";
+			offset = "256K";
+			type = "flash";
+		},
+		{
+			filename = "blob-bl2e.sto.bin.signed";
+			device = "/dev/mtd1";
+			offset = "384K";
+			type = "flash";
+		},
+		{
+			filename = "blob-bl2x.bin.signed";
+			device = "/dev/mtd2";
+			type = "flash";
+		},
+		{
+			filename = "blob-bl2x.bin.signed";
+			device = "/dev/mtd2";
+			offset = "128K";
+			type = "flash";
+		},
+		{
+			filename = "blob-bl2x.bin.signed";
+			device = "/dev/mtd2";
+			offset = "256K";
+			type = "flash";
+		},
+		{
+			filename = "blob-bl2x.bin.signed";
+			device = "/dev/mtd2";
+			offset = "384K";
+			type = "flash";
+		},
+		{
+			filename = "device-fip.bin.signed";
+			device = "/dev/mtd4";
+			type = "flash";
+		},
+		{
+			filename = "device-fip.bin.signed";
+			device = "/dev/mtd4";
+			offset = "3M";
+			type = "flash";
+		},
+		{
+			filename = "device-fip.bin.signed";
+			device = "/dev/mtd4";
+			offset = "6M";
+			type = "flash";
+		},
+		{
+			filename = "device-fip.bin.signed";
+			device = "/dev/mtd4";
+			offset = "9M";
+			type = "flash";
+		}
+	);
+	scripts: (
+		{
+			filename = "update.sh";
+			type = "shellscript";
+		}
+	);
+	uboot: (
+		{
+			name = "upgrade_step";
+			value = "1";
+		}
+	);
+}

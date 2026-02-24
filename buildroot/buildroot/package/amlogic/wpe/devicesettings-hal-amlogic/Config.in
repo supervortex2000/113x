@@ -1,0 +1,5 @@
+menuconfig BR2_PACKAGE_DEVICESETTINGS-HAL-AMLOGIC
+	bool "devicesettings-hal-amlogic"
+	help
+	   rdk devicesettings-hal-amlogic.
+

@@ -1,0 +1,24 @@
+#!/bin/sh
+
+case "$1" in
+    stop);;
+    restart);;
+    start)
+        echo rm default > /sys/class/vfm/map
+        echo add default decoder amvideo > /sys/class/vfm/map
+        chmod 444 /sys/class/vfm/map
+        boot-animation -start &
+        fbset -fb /dev/fb0 -g 720 720 720 1440 32
+        #Sleep to wait for boot animation initialization to complete
+        usleep 910000
+        echo 0 0 719 719 > /sys/class/graphics/fb0/window_axis
+        echo 0 0 719 719 > /sys/class/graphics/fb0/free_scale_axis
+        echo 0x10001 > /sys/class/graphics/fb0/free_scale
+        echo 1 > /sys/class/graphics/fb0/blank
+        echo 1 > /sys/class/graphics/fb1/blank
+        # delay other process
+        usleep 500000
+    ;;
+esac
+
+exit $?

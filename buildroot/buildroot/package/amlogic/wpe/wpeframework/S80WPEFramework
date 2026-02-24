@@ -1,0 +1,115 @@
+#!/bin/sh
+
+#setup_wpeframework_env
+#sync with wpeframework.service
+export WAYLAND_DISPLAY=wayland-0
+export WESTEROS_GL_USE_BEST_MODE=1
+export WESTEROS_GL_MAX_MODE=3840x2160
+export WESTEROS_GL_GRAPHICS_MAX_SIZE=1920x1080
+export WESTEROS_GL_USE_AMLOGIC_AVSYNC=1
+export WESTEROS_SINK_AMLOGIC_USE_DMABUF=1
+export WESTEROS_SINK_USE_FREERUN=1
+export WESTEROS_GL_USE_REFRESH_LOCK=1
+export WESTEROS_GL_USE_UEVENT_HOTPLUG=1
+export MALLOC_ARENA_MAX=1
+export THUNDER_ACCESS=127.0.0.1:80
+
+echo 1 > /sys/module/amvdec_ports/parameters/multiplanar
+echo 1 > /sys/module/amvdec_ports/parameters/vp9_need_prefix
+echo 1 > /sys/module/amvdec_ports/parameters/av1_need_prefix
+echo 0 > /sys/module/drm/parameters/vblankoffdelay
+echo 4181938 > /sys/module/amvdec_mh264/parameters/error_proc_policy
+
+export LD_PRELOAD=/usr/lib/libwesteros_gl.so.0.0.0
+export XDG_RUNTIME_DIR="/run"
+#end of wpeframework env
+
+#Following is for debug environment flag
+#export WESTEROS_GL_DEBUG=1
+export GST_DEBUG=3,westerossink:3,amlhalasink:3
+export GST_DEBUG_NO_COLOR=1
+
+
+start() {
+	# Core dumps
+	#echo 1 > /proc/sys/kernel/core_uses_pid
+	#echo 2 > /proc/sys/fs/suid_dumpable
+	#echo "/tmp/cores/core-pid_%p--process%E" > /proc/sys/kernel/core_pattern
+	#mkdir -p /tmp/cores
+	#ulimit -c unlimited
+
+	# wait a bit
+	sleep 3
+
+	mount -a
+
+	# make sure netflix has proper mapping
+	if [ -f /etc/WPEFramework/plugins/Netflix.json ] && [ ! -d /root/Netflix/dpi ]; then
+		mkdir -p /root/Netflix/dpi
+		ln -sfn /etc/playready /root/Netflix/dpi/playready
+	fi
+
+	# needed for wayland/westeros/weston
+	#export XDG_RUNTIME_DIR=/tmp
+
+	# wait for cpuinfo to come available
+	while [ ! -f /proc/cpuinfo ];
+	do
+		sleep 1
+	done
+
+	# override index.html
+	if [ -f /boot/index.html ]; then
+		cp /boot/index.html /www/
+	fi
+
+	# override config.json
+	if [ -f /boot/config.json ]; then
+		cp /boot/config.json /www/
+	fi
+
+	# read proxy settings from /boot/proxy
+	if [ -f /boot/proxy ]; then
+		PROXY_IP=`cat /boot/proxy`
+		export http_proxy="http://$PROXY_IP"
+		export HTTP_PROXY="http://$PROXY_IP"
+		export no_proxy="127.0.0.1,localhost,ws.metrological.com,widgets.metrological.com"
+		export NO_PROXY="127.0.0.1,localhost,ws.metrological.com,widgets.metrological.com"
+	fi
+
+	echo -n "Starting WPEFramework: "
+	#start-stop-daemon -S -q -b -m -p /var/run/WPEFramework.pid --exec /usr/bin/WPEFramework -- -b -c /etc/WPEFramework/config.json </dev/null >/dev/null 2>&1
+	/usr/bin/WPEFramework -b -c /etc/WPEFramework/config.json 2>&1 | logger &
+	[ $? == 0 ] && echo "OK" || echo "FAIL"
+}
+
+stop() {
+	echo -n "Stopping WPEFramework: "
+	#start-stop-daemon -K -q -p /var/run/WPEFramework.pid
+	killall WPEProcess
+	killall WPEFramework
+	[ $? == 0 ] && echo "OK" || echo "FAIL"
+	rm -rf /var/run/WPEFramework.pid
+}
+
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart|reload)
+		restart
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart}"
+		exit 1
+esac
+
+exit $?

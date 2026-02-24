@@ -1,0 +1,316 @@
+From 59222afe6977b4331a2331a8f7a13592b2ce7377 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Tue, 9 Mar 2021 21:10:57 +0800
+Subject: [PATCH 2/2] Protect gCompositorList
+
+---
+ compositorcontroller.cpp | 41 +++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 37 insertions(+), 4 deletions(-)
+
+diff --git a/compositorcontroller.cpp b/compositorcontroller.cpp
+index 9bef703..c975e64 100644
+--- a/compositorcontroller.cpp
++++ b/compositorcontroller.cpp
+@@ -60,6 +60,7 @@ namespace RdkShell
+         struct CompositorInfo compositorInfo;
+     };
+ 
++    std::recursive_mutex mCompositorListLock;
+     std::vector<CompositorInfo> gCompositorList;
+     CompositorInfo gFocusedCompositor;
+ 
+@@ -166,6 +167,7 @@ namespace RdkShell
+ 
+     void bubbleKey(uint32_t keycode, uint32_t flags, uint64_t metadata, bool isPressed)
+     {
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         std::vector<CompositorInfo>::iterator compositorIterator = gCompositorList.begin();
+         for (compositorIterator = gCompositorList.begin();  compositorIterator != gCompositorList.end(); compositorIterator++)
+         {
+@@ -213,6 +215,7 @@ namespace RdkShell
+ 
+     std::shared_ptr<RdkCompositor> CompositorController::getCompositor(const std::string& displayName)
+     {
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         auto it = std::find_if(std::begin(gCompositorList), std::end(gCompositorList),
+                 [displayName](CompositorInfo& info)
+                     {
+@@ -232,6 +235,7 @@ namespace RdkShell
+     bool CompositorController::moveToFront(const std::string& client)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto it = gCompositorList.begin(); it != gCompositorList.end(); ++it)
+          {
+             if (it->name == clientDisplayName)
+@@ -248,6 +252,7 @@ namespace RdkShell
+     bool CompositorController::moveToBack(const std::string& client)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto it = gCompositorList.begin(); it != gCompositorList.end(); ++it)
+         {
+             if (it->name == clientDisplayName)
+@@ -263,6 +268,7 @@ namespace RdkShell
+ 
+     bool CompositorController::moveBehind(const std::string& client, const std::string& target)
+     {
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         std::vector<CompositorInfo>::iterator clientIterator = gCompositorList.end();
+         std::vector<CompositorInfo>::iterator targetIterator = gCompositorList.end();
+ 
+@@ -304,6 +310,7 @@ namespace RdkShell
+     bool CompositorController::setFocus(const std::string& client)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -318,6 +325,7 @@ namespace RdkShell
+     bool CompositorController::kill(const std::string& client)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto it = gCompositorList.begin(); it != gCompositorList.end(); ++it)
+         {
+             if (it->name == clientDisplayName)
+@@ -375,6 +383,7 @@ namespace RdkShell
+     bool CompositorController::addKeyIntercept(const std::string& client, const uint32_t& keyCode, const uint32_t& flags)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         //std::cout << "key intercept added " << keyCode << " flags " << flags << std::endl;
+         for (auto compositor : gCompositorList)
+         {
+@@ -439,6 +448,7 @@ namespace RdkShell
+         }
+ 
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -486,7 +496,7 @@ namespace RdkShell
+         }
+         std::cout << "key listener added client" << client.c_str() << " activate " << activate << " propagate " << propagate << std::endl;
+         std::cout << "key listener added " << keyCode << " flags " << flags << std::endl;
+-
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (std::vector<CompositorInfo>::iterator it = gCompositorList.begin(); it != gCompositorList.end(); ++it)
+         {
+             if (it->name == clientDisplayName)
+@@ -529,7 +539,7 @@ namespace RdkShell
+     bool CompositorController::removeKeyListener(const std::string& client, const uint32_t& keyCode, const uint32_t& flags)
+     {
+         std::string clientDisplayName = standardizeName(client);
+-
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         std::cout << "key listener removed client" << client.c_str() << " key " << keyCode << " flags " << flags << std::endl;
+ 
+         for (std::vector<CompositorInfo>::iterator it = gCompositorList.begin(); it != gCompositorList.end(); ++it)
+@@ -565,6 +575,7 @@ namespace RdkShell
+     bool CompositorController::addKeyMetadataListener(const std::string& client)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName && compositor.compositor != nullptr)
+@@ -579,6 +590,7 @@ namespace RdkShell
+     bool CompositorController::removeKeyMetadataListener(const std::string& client)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName && compositor.compositor != nullptr)
+@@ -612,7 +624,7 @@ namespace RdkShell
+     bool CompositorController::getClients(std::vector<std::string>& clients)
+     {
+         clients.clear();
+-
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for ( const auto &client : gCompositorList )
+         {
+             std::string clientName = client.name;
+@@ -624,7 +636,7 @@ namespace RdkShell
+     bool CompositorController::getZOrder(std::vector<std::string>&clients)
+     {
+         clients.clear();
+-
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for ( const auto &client : gCompositorList )
+         {
+             std::string clientName = client.name;
+@@ -636,6 +648,7 @@ namespace RdkShell
+     bool CompositorController::getBounds(const std::string& client, uint32_t &x, uint32_t &y, uint32_t &width, uint32_t &height)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -654,6 +667,7 @@ namespace RdkShell
+     bool CompositorController::setBounds(const std::string& client, const uint32_t x, const uint32_t y, const uint32_t width, const uint32_t height)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -669,6 +683,7 @@ namespace RdkShell
+     bool CompositorController::getVisibility(const std::string& client, bool& visible)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -683,6 +698,7 @@ namespace RdkShell
+     bool CompositorController::setVisibility(const std::string& client, const bool visible)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -697,6 +713,7 @@ namespace RdkShell
+     bool CompositorController::getOpacity(const std::string& client, unsigned int& opacity)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -721,6 +738,7 @@ namespace RdkShell
+     bool CompositorController::setOpacity(const std::string& client, const unsigned int opacity)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -737,6 +755,7 @@ namespace RdkShell
+     bool CompositorController::getScale(const std::string& client, double &scaleX, double &scaleY)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -751,6 +770,7 @@ namespace RdkShell
+     bool CompositorController::setScale(const std::string& client, double scaleX, double scaleY)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -765,6 +785,7 @@ namespace RdkShell
+     bool CompositorController::scaleToFit(const std::string& client, const int32_t x, const int32_t y, const uint32_t width, const uint32_t height)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName && compositor.compositor != nullptr)
+@@ -826,6 +847,7 @@ namespace RdkShell
+         {
+             compositorDisplayName = clientDisplayName;
+         }
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock}; 
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -863,6 +885,7 @@ namespace RdkShell
+ 
+     bool CompositorController::draw()
+     {
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock}; 
+         for (std::vector<CompositorInfo>::reverse_iterator reverseIterator = gCompositorList.rbegin() ; reverseIterator != gCompositorList.rend(); reverseIterator++)
+         {
+             reverseIterator->compositor->draw();
+@@ -874,6 +897,7 @@ namespace RdkShell
+         bool ret = false;
+         RdkShell::Animation animation;
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock}; 
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -978,6 +1002,7 @@ namespace RdkShell
+     bool CompositorController::addListener(const std::string& client, std::shared_ptr<RdkShellEventListener> listener)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto it = gCompositorList.begin(); it != gCompositorList.end(); ++it)
+         {
+            if (it->name == clientDisplayName)
+@@ -992,6 +1017,7 @@ namespace RdkShell
+     bool CompositorController::removeListener(const std::string& client, std::shared_ptr<RdkShellEventListener> listener)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto it = gCompositorList.begin(); it != gCompositorList.end(); ++it)
+         {
+             if (it->name == clientDisplayName)
+@@ -1017,6 +1043,7 @@ namespace RdkShell
+ 
+     bool CompositorController::onEvent(RdkCompositor* eventCompositor, const std::string& eventName)
+     {
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+          {
+             if (compositor.compositor.get() == eventCompositor)
+@@ -1058,6 +1085,7 @@ namespace RdkShell
+         if (mimeType == RDKSHELL_APPLICATION_MIME_TYPE_NATIVE)
+         {
+             std::string clientDisplayName = standardizeName(client);
++            std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+             for (auto compositor : gCompositorList)
+             {
+                 if (compositor.name == clientDisplayName)
+@@ -1096,6 +1124,7 @@ namespace RdkShell
+     bool CompositorController::suspendApplication(const std::string& client)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -1121,6 +1150,7 @@ namespace RdkShell
+     bool CompositorController::resumeApplication(const std::string& client)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -1145,6 +1175,7 @@ namespace RdkShell
+     bool CompositorController::closeApplication(const std::string& client)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -1166,6 +1197,7 @@ namespace RdkShell
+     {
+         mimeType = "";
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+@@ -1180,6 +1212,7 @@ namespace RdkShell
+     bool CompositorController::setMimeType(const std::string& client, const std::string& mimeType)
+     {
+         std::string clientDisplayName = standardizeName(client);
++        std::lock_guard<std::recursive_mutex> lock{mCompositorListLock};
+         for (auto compositor : gCompositorList)
+         {
+             if (compositor.name == clientDisplayName)
+-- 
+2.7.4
+

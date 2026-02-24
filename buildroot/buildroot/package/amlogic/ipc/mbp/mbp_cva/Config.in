@@ -1,0 +1,7 @@
+menu "cvs"
+config BR2_PACKAGE_SAMPLE
+	bool "cvs"
+    depends on BR2_PACKAGE_MBI
+	help
+	   cvs
+endmenu

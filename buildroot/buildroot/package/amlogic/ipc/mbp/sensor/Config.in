@@ -1,0 +1,8 @@
+config BR2_PACKAGE_SENSOR
+	bool "sensor"
+    depends on BR2_PACKAGE_MBD_BASE
+    depends on BR2_PACKAGE_PMZ
+    depends on BR2_PACKAGE_MBD_CAMERA
+    depends on BR2_PACKAGE_MBI
+    help
+	  media business interface sensor

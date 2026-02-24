@@ -1,0 +1,70 @@
+From df14f90760c491119dd4fe4bad693e0a0985ba15 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Sat, 8 May 2021 17:28:50 +0800
+Subject: [PATCH] Delete tracebuffer directly
+
+Change-Id: I47a1096013359c12f453c71f8edbcaf4b74ccd72
+---
+ Source/core/DataElementFile.cpp | 6 ++++--
+ Source/core/FileSystem.h        | 6 ++++--
+ Source/tracing/TraceUnit.cpp    | 3 ++-
+ 3 files changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/Source/core/DataElementFile.cpp b/Source/core/DataElementFile.cpp
+index 39e2e0bb..bce783d0 100644
+--- a/Source/core/DataElementFile.cpp
++++ b/Source/core/DataElementFile.cpp
+@@ -219,8 +219,10 @@ namespace Core {
+             munmap(m_MemoryMappedFile, AllocatedSize());
+ 
+             m_MemoryMappedFile = INVALID_HANDLE_VALUE;
+-
+-            m_File.Close();
++            if ((m_Flags & File::CLOSE_DELETE) != 0)
++              m_File.Destroy();
++            else
++              m_File.Close();
+         }
+     }
+ 
+diff --git a/Source/core/FileSystem.h b/Source/core/FileSystem.h
+index 47bfe48e..3e4d7618 100644
+--- a/Source/core/FileSystem.h
++++ b/Source/core/FileSystem.h
+@@ -71,7 +71,8 @@ namespace Core {
+             OTHERS_WRITE   = 0x00000080,
+             OTHERS_EXECUTE = 0x00000100,
+             SHAREABLE      = 0x10000000,
+-            CREATE         = 0x20000000
++            CREATE         = 0x20000000,
++            CLOSE_DELETE   = 0x40000000   // Delete this file directly after close it
+        } Mode;
+ 
+ #endif
+@@ -107,7 +108,8 @@ namespace Core {
+             OTHERS_WRITE   = S_IWOTH,
+             OTHERS_EXECUTE = S_IXOTH,
+             SHAREABLE      = 0x10000000,
+-            CREATE         = 0x20000000
++            CREATE         = 0x20000000,
++            CLOSE_DELETE   = 0x40000000   // Delete this file directly after close it
+        } Mode;
+ 
+ 
+diff --git a/Source/tracing/TraceUnit.cpp b/Source/tracing/TraceUnit.cpp
+index 4958423a..92014e83 100644
+--- a/Source/tracing/TraceUnit.cpp
++++ b/Source/tracing/TraceUnit.cpp
+@@ -125,7 +125,8 @@ namespace Trace {
+                                 Core::File::GROUP_WRITE  |
+                                 Core::File::OTHERS_READ  |
+                                 Core::File::OTHERS_WRITE | 
+-                                Core::File::SHAREABLE,
++                                Core::File::SHAREABLE    |
++                                Core::File::CLOSE_DELETE,
+                              CyclicBufferSize, true)
+         , _doorBell(doorBell.c_str())
+     {
+-- 
+2.31.0
+

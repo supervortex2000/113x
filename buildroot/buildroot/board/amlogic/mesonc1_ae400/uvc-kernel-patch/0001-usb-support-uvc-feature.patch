@@ -1,0 +1,737 @@
+diff --git a/drivers/usb/gadget/function/f_uvc.c b/drivers/usb/gadget/function/f_uvc.c
+index f06e6da..aea63f0 100644
+--- a/drivers/usb/gadget/function/f_uvc.c
++++ b/drivers/usb/gadget/function/f_uvc.c
+@@ -869,8 +869,8 @@ static struct usb_function_instance *uvc_alloc_inst(void)
+ 	pd->bSourceID			= 1;
+ 	pd->wMaxMultiplier		= cpu_to_le16(16*1024);
+ 	pd->bControlSize		= 2;
+-	pd->bmControls[0]		= 1;
+-	pd->bmControls[1]		= 0;
++	pd->bmControls[0]		= 159;//0x1f
++	pd->bmControls[1]		= 39;//0x27
+ 	pd->iProcessing			= 0;
+ 
+ 	od = &opts->uvc_output_terminal;
+diff --git a/drivers/usb/gadget/function/uvc_configfs.c b/drivers/usb/gadget/function/uvc_configfs.c
+index b51f0d2..34ec77b 100644
+--- a/drivers/usb/gadget/function/uvc_configfs.c
++++ b/drivers/usb/gadget/function/uvc_configfs.c
+@@ -13,6 +13,7 @@
+ #include "uvc_configfs.h"
+ 
+ #define UVCG_STREAMING_CONTROL_SIZE	1
++#define le8_to_cpu(x)	(x)
+ 
+ #define UVC_ATTR(prefix, cname, aname) \
+ static struct configfs_attribute prefix##attr_##cname = { \
+@@ -46,6 +47,8 @@ struct uvcg_control_header {
+ 	unsigned			linked;
+ };
+ 
++static void uvcg_format_set_indices(struct config_group *fmt);
++
+ static struct uvcg_control_header *to_uvcg_control_header(struct config_item *item)
+ {
+ 	return container_of(item, struct uvcg_control_header, item);
+@@ -388,6 +391,17 @@ static const struct config_item_type uvcg_default_camera_type = {
+ 	.ct_owner	= THIS_MODULE,
+ };
+ 
++static void uvcg_config_item_release(struct config_item *item)
++{
++	struct config_group *group = to_config_group(item);
++
++	kfree(group);
++}
++
++static struct configfs_item_operations uvcg_config_item_ops = {
++	.release	= uvcg_config_item_release,
++};
++
+ /* struct uvcg_camera {}; */
+ 
+ /* control/terminal/camera */
+@@ -620,14 +634,21 @@ static struct uvcg_mjpeg_grp {
+ 	struct config_group	group;
+ } uvcg_mjpeg_grp;
+ 
++/* streaming/mjpeg */
++static struct uvcg_framebased_grp {
++	struct config_group	group;
++} uvcg_framebased_grp;
++
+ static struct config_item *fmt_parent[] = {
+ 	&uvcg_uncompressed_grp.group.cg_item,
+ 	&uvcg_mjpeg_grp.group.cg_item,
++	&uvcg_framebased_grp.group.cg_item,
+ };
+ 
+ enum uvcg_format_type {
+ 	UVCG_UNCOMPRESSED = 0,
+ 	UVCG_MJPEG,
++	UVCG_FRAMEBASED,
+ };
+ 
+ struct uvcg_format {
+@@ -755,6 +776,8 @@ static int uvcg_streaming_header_allow_link(struct config_item *src,
+ 	if (!target_fmt)
+ 		goto out;
+ 
++	uvcg_format_set_indices(to_config_group(target));
++
+ 	format_ptr = kzalloc(sizeof(*format_ptr), GFP_KERNEL);
+ 	if (!format_ptr) {
+ 		ret = -ENOMEM;
+@@ -919,9 +942,15 @@ struct uvcg_frame {
+ 		u16	w_height;
+ 		u32	dw_min_bit_rate;
+ 		u32	dw_max_bit_rate;
++/*
++ * dw_max_video_frame_buffer_size is only for uncompressed and
++ * mjpeg format
++ */
+ 		u32	dw_max_video_frame_buffer_size;
+ 		u32	dw_default_frame_interval;
+ 		u8	b_frame_interval_type;
++/* dw_bytes_perline is only for framebased format */
++		u32	dw_bytes_perline;
+ 	} __attribute__((packed)) frame;
+ 	u32 *dw_frame_interval;
+ 	enum uvcg_format_type	fmt_type;
+@@ -994,6 +1023,9 @@ UVC_ATTR(uvcg_frame_, cname, aname);
+ 
+ #define noop_conversion(x) (x)
+ 
++UVCG_FRAME_ATTR(b_frame_index, bFrameIndex, noop_conversion,
++		noop_conversion, 8);
++
+ UVCG_FRAME_ATTR(bm_capabilities, bmCapabilities, noop_conversion,
+ 		noop_conversion, 8);
+ UVCG_FRAME_ATTR(w_width, wWidth, le16_to_cpu, cpu_to_le16, 16);
+@@ -1004,6 +1036,7 @@ UVCG_FRAME_ATTR(dw_max_video_frame_buffer_size, dwMaxVideoFrameBufferSize,
+ 		le32_to_cpu, cpu_to_le32, 32);
+ UVCG_FRAME_ATTR(dw_default_frame_interval, dwDefaultFrameInterval,
+ 		le32_to_cpu, cpu_to_le32, 32);
++UVCG_FRAME_ATTR(dw_bytes_perline, dwBytesPerLine, le32_to_cpu, cpu_to_le32, 32);
+ 
+ #undef noop_conversion
+ 
+@@ -1139,7 +1172,8 @@ static ssize_t uvcg_frame_dw_frame_interval_store(struct config_item *item,
+ 
+ UVC_ATTR(uvcg_frame_, dw_frame_interval, dwFrameInterval);
+ 
+-static struct configfs_attribute *uvcg_frame_attrs[] = {
++static struct configfs_attribute *uvcg_frame_attrs1[] = {
++	&uvcg_frame_attr_b_frame_index,
+ 	&uvcg_frame_attr_bm_capabilities,
+ 	&uvcg_frame_attr_w_width,
+ 	&uvcg_frame_attr_w_height,
+@@ -1151,11 +1185,48 @@ static struct configfs_attribute *uvcg_frame_attrs[] = {
+ 	NULL,
+ };
+ 
+-static const struct config_item_type uvcg_frame_type = {
+-	.ct_attrs	= uvcg_frame_attrs,
++static struct configfs_attribute *uvcg_frame_attrs2[] = {
++	&uvcg_frame_attr_b_frame_index,
++	&uvcg_frame_attr_bm_capabilities,
++	&uvcg_frame_attr_w_width,
++	&uvcg_frame_attr_w_height,
++	&uvcg_frame_attr_dw_min_bit_rate,
++	&uvcg_frame_attr_dw_max_bit_rate,
++	&uvcg_frame_attr_dw_default_frame_interval,
++	&uvcg_frame_attr_dw_frame_interval,
++	&uvcg_frame_attr_dw_bytes_perline,
++	NULL,
++};
++
++static struct config_item_type uvcg_frame_type1 = {
++	.ct_item_ops	= &uvcg_config_item_ops,
++	.ct_attrs	= uvcg_frame_attrs1,
+ 	.ct_owner	= THIS_MODULE,
+ };
+ 
++static struct config_item_type uvcg_frame_type2 = {
++	.ct_item_ops	= &uvcg_config_item_ops,
++	.ct_attrs	= uvcg_frame_attrs2,
++	.ct_owner	= THIS_MODULE,
++};
++
++static void uvcg_format_set_indices(struct config_group *fmt)
++{
++	struct config_item *ci;
++	unsigned int i = 1;
++
++	list_for_each_entry(ci, &fmt->cg_children, ci_entry) {
++		struct uvcg_frame *frm;
++
++		if (ci->ci_type != &uvcg_frame_type1 ||
++		    ci->ci_type != &uvcg_frame_type2)
++			continue;
++
++		frm = to_uvcg_frame(ci);
++		frm->frame.b_frame_index = i++;
++	}
++}
++
+ static struct config_item *uvcg_frame_make(struct config_group *group,
+ 					   const char *name)
+ {
+@@ -1170,12 +1241,13 @@ static struct config_item *uvcg_frame_make(struct config_group *group,
+ 
+ 	h->frame.b_descriptor_type		= USB_DT_CS_INTERFACE;
+ 	h->frame.b_frame_index			= 1;
+-	h->frame.w_width			= cpu_to_le16(640);
+-	h->frame.w_height			= cpu_to_le16(360);
++	h->frame.w_width			= cpu_to_le16(1920);
++	h->frame.w_height			= cpu_to_le16(1080);
+ 	h->frame.dw_min_bit_rate		= cpu_to_le32(18432000);
+ 	h->frame.dw_max_bit_rate		= cpu_to_le32(55296000);
+ 	h->frame.dw_max_video_frame_buffer_size	= cpu_to_le32(460800);
+-	h->frame.dw_default_frame_interval	= cpu_to_le32(666666);
++	h->frame.dw_default_frame_interval	= cpu_to_le32(333333);
++	h->frame.dw_bytes_perline = 0;
+ 
+ 	opts_item = group->cg_item.ci_parent->ci_parent->ci_parent;
+ 	opts = to_f_uvc_opts(opts_item);
+@@ -1188,6 +1260,9 @@ static struct config_item *uvcg_frame_make(struct config_group *group,
+ 	} else if (fmt->type == UVCG_MJPEG) {
+ 		h->frame.b_descriptor_subtype = UVC_VS_FRAME_MJPEG;
+ 		h->fmt_type = UVCG_MJPEG;
++	} else if (fmt->type == UVCG_FRAMEBASED) {
++		h->frame.b_descriptor_subtype = UVC_VS_FRAME_FRAME_BASED;
++		h->fmt_type = UVCG_FRAMEBASED;
+ 	} else {
+ 		mutex_unlock(&opts->lock);
+ 		kfree(h);
+@@ -1196,7 +1271,10 @@ static struct config_item *uvcg_frame_make(struct config_group *group,
+ 	++fmt->num_frames;
+ 	mutex_unlock(&opts->lock);
+ 
+-	config_item_init_type_name(&h->item, name, &uvcg_frame_type);
++	if (fmt->type == UVCG_FRAMEBASED)
++		config_item_init_type_name(&h->item, name, &uvcg_frame_type2);
++	else
++		config_item_init_type_name(&h->item, name, &uvcg_frame_type1);
+ 
+ 	return &h->item;
+ }
+@@ -1380,6 +1458,7 @@ UVC_ATTR(uvcg_uncompressed_, cname, aname);
+ 
+ #define identity_conv(x) (x)
+ 
++UVCG_UNCOMPRESSED_ATTR(b_format_index, bFormatIndex, identity_conv);
+ UVCG_UNCOMPRESSED_ATTR(b_bits_per_pixel, bBitsPerPixel, identity_conv);
+ UVCG_UNCOMPRESSED_ATTR(b_default_frame_index, bDefaultFrameIndex,
+ 		       identity_conv);
+@@ -1410,6 +1489,7 @@ uvcg_uncompressed_bma_controls_store(struct config_item *item,
+ UVC_ATTR(uvcg_uncompressed_, bma_controls, bmaControls);
+ 
+ static struct configfs_attribute *uvcg_uncompressed_attrs[] = {
++	&uvcg_uncompressed_attr_b_format_index,
+ 	&uvcg_uncompressed_attr_guid_format,
+ 	&uvcg_uncompressed_attr_b_bits_per_pixel,
+ 	&uvcg_uncompressed_attr_b_default_frame_index,
+@@ -1583,6 +1663,7 @@ UVC_ATTR(uvcg_mjpeg_, cname, aname)
+ 
+ UVCG_MJPEG_ATTR(b_default_frame_index, bDefaultFrameIndex,
+ 		       identity_conv);
++UVCG_MJPEG_ATTR(b_format_index, bFormatIndex, identity_conv);
+ UVCG_MJPEG_ATTR_RO(bm_flags, bmFlags, identity_conv);
+ UVCG_MJPEG_ATTR_RO(b_aspect_ratio_x, bAspectRatioX, identity_conv);
+ UVCG_MJPEG_ATTR_RO(b_aspect_ratio_y, bAspectRatioY, identity_conv);
+@@ -1611,6 +1692,7 @@ uvcg_mjpeg_bma_controls_store(struct config_item *item,
+ UVC_ATTR(uvcg_mjpeg_, bma_controls, bmaControls);
+ 
+ static struct configfs_attribute *uvcg_mjpeg_attrs[] = {
++	&uvcg_mjpeg_attr_b_format_index,
+ 	&uvcg_mjpeg_attr_b_default_frame_index,
+ 	&uvcg_mjpeg_attr_bm_flags,
+ 	&uvcg_mjpeg_attr_b_aspect_ratio_x,
+@@ -1669,7 +1751,262 @@ static const struct config_item_type uvcg_mjpeg_grp_type = {
+ 	.ct_owner	= THIS_MODULE,
+ };
+ 
+-/* streaming/color_matching/default */
++/* -----------------------------------------------------------------------------
++ * streaming/framebased/<NAME>
++ */
++
++struct uvcg_framebased {
++	struct uvcg_format		fmt;
++	struct uvc_format_framebased	desc;
++};
++
++static struct uvcg_framebased *to_uvcg_framebased(struct config_item *item)
++{
++	return container_of(container_of(to_config_group(item),
++					 struct uvcg_format, group),
++			    struct uvcg_framebased, fmt);
++}
++
++static struct configfs_group_operations uvcg_framebased_group_ops = {
++	.make_item		= uvcg_frame_make,
++	.drop_item		= uvcg_frame_drop,
++};
++
++#define UVCG_FRAMEBASED_ATTR_RO(cname, aname, bits)			\
++static ssize_t uvcg_framebased_##cname##_show(struct config_item *item,	\
++					      char *page)		\
++{									\
++	struct uvcg_framebased *u = to_uvcg_framebased(item);		\
++	struct f_uvc_opts *opts;					\
++	struct config_item *opts_item;					\
++	struct mutex *su_mutex = &u->fmt.group.cg_subsys->su_mutex;	\
++	int result;							\
++									\
++	mutex_lock(su_mutex); /* for navigating configfs hierarchy */	\
++									\
++	opts_item = u->fmt.group.cg_item.ci_parent->ci_parent->ci_parent;\
++	opts = to_f_uvc_opts(opts_item);				\
++									\
++	mutex_lock(&opts->lock);					\
++	result = sprintf(page, "%u\n", le##bits##_to_cpu(u->desc.aname));\
++	mutex_unlock(&opts->lock);					\
++									\
++	mutex_unlock(su_mutex);						\
++	return result;							\
++}									\
++									\
++UVC_ATTR_RO(uvcg_framebased_, cname, aname)
++
++#define UVCG_FRAMEBASED_ATTR(cname, aname, bits)			\
++static ssize_t uvcg_framebased_##cname##_show(struct config_item *item,\
++					      char *page)		\
++{									\
++	struct uvcg_framebased *u = to_uvcg_framebased(item);		\
++	struct f_uvc_opts *opts;					\
++	struct config_item *opts_item;					\
++	struct mutex *su_mutex = &u->fmt.group.cg_subsys->su_mutex;	\
++	int result;							\
++									\
++	mutex_lock(su_mutex); /* for navigating configfs hierarchy */	\
++									\
++	opts_item = u->fmt.group.cg_item.ci_parent->ci_parent->ci_parent;\
++	opts = to_f_uvc_opts(opts_item);				\
++									\
++	mutex_lock(&opts->lock);					\
++	result = sprintf(page, "%u\n", le##bits##_to_cpu(u->desc.aname));\
++	mutex_unlock(&opts->lock);					\
++									\
++	mutex_unlock(su_mutex);						\
++	return result;							\
++}									\
++									\
++static ssize_t								\
++uvcg_framebased_##cname##_store(struct config_item *item,		\
++				const char *page, size_t len)		\
++{									\
++	struct uvcg_framebased *u = to_uvcg_framebased(item);		\
++	struct f_uvc_opts *opts;					\
++	struct config_item *opts_item;					\
++	struct mutex *su_mutex = &u->fmt.group.cg_subsys->su_mutex;	\
++	int ret;							\
++	u8 num;								\
++									\
++	mutex_lock(su_mutex); /* for navigating configfs hierarchy */	\
++									\
++	opts_item = u->fmt.group.cg_item.ci_parent->ci_parent->ci_parent;\
++	opts = to_f_uvc_opts(opts_item);				\
++									\
++	mutex_lock(&opts->lock);					\
++	if (u->fmt.linked || opts->refcnt) {				\
++		ret = -EBUSY;						\
++		goto end;						\
++	}								\
++									\
++	ret = kstrtou8(page, 0, &num);					\
++	if (ret)							\
++		goto end;						\
++									\
++	if (num > 255) {						\
++		ret = -EINVAL;						\
++		goto end;						\
++	}								\
++	u->desc.aname = num;						\
++	ret = len;							\
++end:									\
++	mutex_unlock(&opts->lock);					\
++	mutex_unlock(su_mutex);						\
++	return ret;							\
++}									\
++									\
++UVC_ATTR(uvcg_framebased_, cname, aname)
++
++UVCG_FRAMEBASED_ATTR(b_format_index, bFormatIndex, 8);
++UVCG_FRAMEBASED_ATTR_RO(b_bits_per_pixel, bBitsPerPixel, 8);
++UVCG_FRAMEBASED_ATTR(b_default_frame_index, bDefaultFrameIndex, 8);
++UVCG_FRAMEBASED_ATTR_RO(b_aspect_ratio_x, bAspectRatioX, 8);
++UVCG_FRAMEBASED_ATTR_RO(b_aspect_ratio_y, bAspectRatioY, 8);
++UVCG_FRAMEBASED_ATTR_RO(bm_interface_flags, bmInterfaceFlags, 8);
++
++#undef UVCG_FRAMEBASED_ATTR
++#undef UVCG_FRAMEBASED_ATTR_RO
++
++static ssize_t uvcg_framebased_guid_format_show(struct config_item *item,
++						char *page)
++{
++	struct uvcg_framebased *ch = to_uvcg_framebased(item);
++	struct f_uvc_opts *opts;
++	struct config_item *opts_item;
++	struct mutex *su_mutex = &ch->fmt.group.cg_subsys->su_mutex;
++
++	mutex_lock(su_mutex); /* for navigating configfs hierarchy */
++
++	opts_item = ch->fmt.group.cg_item.ci_parent->ci_parent->ci_parent;
++	opts = to_f_uvc_opts(opts_item);
++
++	mutex_lock(&opts->lock);
++	memcpy(page, ch->desc.guidFormat, sizeof(ch->desc.guidFormat));
++	mutex_unlock(&opts->lock);
++
++	mutex_unlock(su_mutex);
++
++	return sizeof(ch->desc.guidFormat);
++}
++
++static ssize_t uvcg_framebased_guid_format_store(struct config_item *item,
++						 const char *page, size_t len)
++{
++	struct uvcg_framebased *ch = to_uvcg_framebased(item);
++	struct f_uvc_opts *opts;
++	struct config_item *opts_item;
++	struct mutex *su_mutex = &ch->fmt.group.cg_subsys->su_mutex;
++	int ret;
++
++	mutex_lock(su_mutex); /* for navigating configfs hierarchy */
++
++	opts_item = ch->fmt.group.cg_item.ci_parent->ci_parent->ci_parent;
++	opts = to_f_uvc_opts(opts_item);
++
++	mutex_lock(&opts->lock);
++	if (ch->fmt.linked || opts->refcnt) {
++		ret = -EBUSY;
++		goto end;
++	}
++
++	memcpy(ch->desc.guidFormat, page,
++	       min(sizeof(ch->desc.guidFormat), len));
++	ret = sizeof(ch->desc.guidFormat);
++
++end:
++	mutex_unlock(&opts->lock);
++	mutex_unlock(su_mutex);
++	return ret;
++}
++
++UVC_ATTR(uvcg_framebased_, guid_format, guidFormat);
++
++static inline ssize_t
++uvcg_framebased_bma_controls_show(struct config_item *item, char *page)
++{
++	struct uvcg_framebased *u = to_uvcg_framebased(item);
++
++	return uvcg_format_bma_controls_show(&u->fmt, page);
++}
++
++static inline ssize_t
++uvcg_framebased_bma_controls_store(struct config_item *item,
++				   const char *page, size_t len)
++{
++	struct uvcg_framebased *u = to_uvcg_framebased(item);
++
++	return uvcg_format_bma_controls_store(&u->fmt, page, len);
++}
++
++UVC_ATTR(uvcg_framebased_, bma_controls, bmaControls);
++
++static struct configfs_attribute *uvcg_framebased_attrs[] = {
++	&uvcg_framebased_attr_b_format_index,
++	&uvcg_framebased_attr_b_default_frame_index,
++	&uvcg_framebased_attr_b_bits_per_pixel,
++	&uvcg_framebased_attr_b_aspect_ratio_x,
++	&uvcg_framebased_attr_b_aspect_ratio_y,
++	&uvcg_framebased_attr_bm_interface_flags,
++	&uvcg_framebased_attr_bma_controls,
++	&uvcg_framebased_attr_guid_format,
++	NULL,
++};
++
++static struct config_item_type uvcg_framebased_type = {
++	.ct_item_ops	= &uvcg_config_item_ops,
++	.ct_group_ops	= &uvcg_framebased_group_ops,
++	.ct_attrs	= uvcg_framebased_attrs,
++	.ct_owner	= THIS_MODULE,
++};
++
++static struct config_group *uvcg_framebased_make(struct config_group *group,
++						 const char *name)
++{
++	static char guid[] = { /*Declear frame frame based as H264*/
++		'H', '2', '6', '4', 0x00, 0x00, 0x10, 0x00,
++		0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71
++	};
++	struct uvcg_framebased *f;
++
++	f = kzalloc(sizeof(*f), GFP_KERNEL);
++	if (!f)
++		return ERR_PTR(-ENOMEM);
++
++	f->desc.bLength			= UVC_DT_FORMAT_FRAMEBASED_SIZE;
++	f->desc.bDescriptorType		= USB_DT_CS_INTERFACE;
++	f->desc.bDescriptorSubType	= UVC_VS_FORMAT_FRAME_BASED;
++	memcpy(f->desc.guidFormat, guid, sizeof(guid));
++	f->desc.bBitsPerPixel		= 16;
++	f->desc.bDefaultFrameIndex	= 1;
++	f->desc.bAspectRatioX		= 0;
++	f->desc.bAspectRatioY		= 0;
++	f->desc.bmInterfaceFlags	= 0;
++	f->desc.bCopyProtect		= 0;
++	f->desc.bVariableSize		= 1;
++
++	f->fmt.type = UVCG_FRAMEBASED;
++	config_group_init_type_name(&f->fmt.group, name,
++				    &uvcg_framebased_type);
++
++	return &f->fmt.group;
++}
++
++static struct configfs_group_operations uvcg_framebased_grp_ops = {
++	.make_group		= uvcg_framebased_make,
++};
++
++static struct config_item_type uvcg_framebased_grp_type = {
++	.ct_group_ops	= &uvcg_framebased_grp_ops,
++	.ct_owner	= THIS_MODULE,
++};
++
++/* -----------------------------------------------------------------------------
++ * streaming/color_matching/default
++ */
++
+ static struct uvcg_default_color_matching {
+ 	struct config_group	group;
+ } uvcg_default_color_matching;
+@@ -1864,6 +2201,11 @@ static int __uvcg_cnt_strm(void *priv1, void *priv2, void *priv3, int n,
+ 				container_of(fmt, struct uvcg_mjpeg, fmt);
+ 
+ 			*size += sizeof(m->desc);
++		} else if (fmt->type == UVCG_FRAMEBASED) {
++			struct uvcg_framebased *f =
++				container_of(fmt, struct uvcg_framebased, fmt);
++
++			*size += sizeof(f->desc);
+ 		} else {
+ 			return -EINVAL;
+ 		}
+@@ -1874,6 +2216,12 @@ static int __uvcg_cnt_strm(void *priv1, void *priv2, void *priv3, int n,
+ 		int sz = sizeof(frm->dw_frame_interval);
+ 
+ 		*size += sizeof(frm->frame);
++/*
++ * framebased has duplicate member with uncompressed and
++ * mjpeg, so minus it
++ */
++		*size -= sizeof(u32);
++
+ 		*size += frm->frame.b_frame_interval_type * sz;
+ 	}
+ 	break;
+@@ -1884,6 +2232,27 @@ static int __uvcg_cnt_strm(void *priv1, void *priv2, void *priv3, int n,
+ 	return 0;
+ }
+ 
++static int __uvcg_copy_framebased_desc(void *dest, struct uvcg_frame *frm,
++				       int sz)
++{
++	struct uvc_frame_framebased *desc = dest;
++
++	desc->bLength = frm->frame.b_length;
++	desc->bDescriptorType = frm->frame.b_descriptor_type;
++	desc->bDescriptorSubType = frm->frame.b_descriptor_subtype;
++	desc->bFrameIndex = frm->frame.b_frame_index;
++	desc->bmCapabilities = frm->frame.bm_capabilities;
++	desc->wWidth = frm->frame.w_width;
++	desc->wHeight = frm->frame.w_height;
++	desc->dwMinBitRate = frm->frame.dw_min_bit_rate;
++	desc->dwMaxBitRate = frm->frame.dw_max_bit_rate;
++	desc->dwDefaultFrameInterval = frm->frame.dw_default_frame_interval;
++	desc->bFrameIntervalType = frm->frame.b_frame_interval_type;
++	desc->dwBytesPerLine = frm->frame.dw_bytes_perline;
++
++	return 0;
++}
++
+ /*
+  * Fill an array of streaming descriptors.
+  *
+@@ -1940,6 +2309,15 @@ static int __uvcg_fill_strm(void *priv1, void *priv2, void *priv3, int n,
+ 			*dest += sizeof(m->desc);
+ 			mjp->bNumFrameDescriptors = fmt->num_frames;
+ 			mjp->bFormatIndex = n + 1;
++		} else if (fmt->type == UVCG_FRAMEBASED) {
++			struct uvc_format_framebased *frb = *dest;
++			struct uvcg_framebased *f =
++				container_of(fmt, struct uvcg_framebased, fmt);
++
++			memcpy(*dest, &f->desc, sizeof(f->desc));
++			*dest += sizeof(f->desc);
++			frb->bFormatIndex = n + 1;
++			frb->bNumFrameDescriptors = fmt->num_frames;
+ 		} else {
+ 			return -EINVAL;
+ 		}
+@@ -1949,8 +2327,12 @@ static int __uvcg_fill_strm(void *priv1, void *priv2, void *priv3, int n,
+ 		struct uvcg_frame *frm = priv1;
+ 		struct uvc_descriptor_header *h = *dest;
+ 
+-		sz = sizeof(frm->frame);
+-		memcpy(*dest, &frm->frame, sz);
++		sz = sizeof(frm->frame) - 4;
++		if (frm->fmt_type != UVCG_FRAMEBASED)
++			memcpy(*dest, &frm->frame, sz);
++		else
++			__uvcg_copy_framebased_desc(*dest, frm, sz);
++
+ 		*dest += sz;
+ 		sz = frm->frame.b_frame_interval_type *
+ 			sizeof(*frm->dw_frame_interval);
+@@ -1962,6 +2344,9 @@ static int __uvcg_fill_strm(void *priv1, void *priv2, void *priv3, int n,
+ 		else if (frm->fmt_type == UVCG_MJPEG)
+ 			h->bLength = UVC_DT_FRAME_MJPEG_SIZE(
+ 				frm->frame.b_frame_interval_type);
++		else if (frm->fmt_type == UVCG_FRAMEBASED)
++			h->bLength =
++		UVC_DT_FRAME_FRAMEBASED_SIZE(frm->frame.b_frame_interval_type);
+ 	}
+ 	break;
+ 	}
+@@ -2258,6 +2643,9 @@ int uvcg_attach_configfs(struct f_uvc_opts *opts)
+ 	config_group_init_type_name(&uvcg_mjpeg_grp.group,
+ 				    "mjpeg",
+ 				    &uvcg_mjpeg_grp_type);
++	config_group_init_type_name(&uvcg_framebased_grp.group,
++				    "framebased",
++				    &uvcg_framebased_grp_type);
+ 	config_group_init_type_name(&uvcg_default_color_matching.group,
+ 				    "default",
+ 				    &uvcg_default_color_matching_type);
+@@ -2290,6 +2678,8 @@ int uvcg_attach_configfs(struct f_uvc_opts *opts)
+ 			&uvcg_streaming_grp.group);
+ 	configfs_add_default_group(&uvcg_mjpeg_grp.group,
+ 			&uvcg_streaming_grp.group);
++	configfs_add_default_group(&uvcg_framebased_grp.group,
++			&uvcg_streaming_grp.group);
+ 	configfs_add_default_group(&uvcg_color_matching_grp.group,
+ 			&uvcg_streaming_grp.group);
+ 	configfs_add_default_group(&uvcg_streaming_class_grp.group,
+diff --git a/drivers/usb/gadget/function/uvc_queue.c b/drivers/usb/gadget/function/uvc_queue.c
+index 9e33d52..b5f5499 100644
+--- a/drivers/usb/gadget/function/uvc_queue.c
++++ b/drivers/usb/gadget/function/uvc_queue.c
+@@ -50,7 +50,6 @@ static int uvc_queue_setup(struct vb2_queue *vq,
+ 	*nplanes = 1;
+ 
+ 	sizes[0] = video->imagesize;
+-
+ 	return 0;
+ }
+ 
+diff --git a/drivers/usb/gadget/function/uvc_video.c b/drivers/usb/gadget/function/uvc_video.c
+index d3567b9..bd45b8b 100644
+--- a/drivers/usb/gadget/function/uvc_video.c
++++ b/drivers/usb/gadget/function/uvc_video.c
+@@ -382,10 +382,10 @@ int uvcg_video_init(struct uvc_video *video)
+ 
+ 	video->fcc = V4L2_PIX_FMT_YUYV;
+ 	video->bpp = 16;
+-	video->width = 320;
+-	video->height = 240;
+-	video->imagesize = 320 * 240 * 2;
+-
++	video->width = 1920;
++	video->height = 1080;
++	//video->imagesize = 320 * 240 * 2;
++	video->imagesize = 1024;
+ 	/* Initialize the video buffers queue. */
+ 	uvcg_queue_init(&video->queue, V4L2_BUF_TYPE_VIDEO_OUTPUT,
+ 			&video->mutex);
+diff --git a/include/uapi/linux/usb/video.h b/include/uapi/linux/usb/video.h
+index ff6cc6c..f43cc2e 100644
+--- a/include/uapi/linux/usb/video.h
++++ b/include/uapi/linux/usb/video.h
+@@ -300,7 +300,7 @@ struct uvc_processing_unit_descriptor {
+ 	__u8  bSourceID;
+ 	__u16 wMaxMultiplier;
+ 	__u8  bControlSize;
+-	__u8  bmControls[2];
++	__u8  bmControls[14];
+ 	__u8  iProcessing;
+ } __attribute__((__packed__));
+ 
+@@ -566,5 +566,64 @@ struct UVC_FRAME_MJPEG(n) {				\
+ 	__u32 dwFrameInterval[n];			\
+ } __attribute__ ((packed))
+ 
++/* Frame Based Payload - 3.1.1. Frame Based Video Format Descriptor */
++struct uvc_format_framebased {
++	__u8  bLength;
++	__u8  bDescriptorType;
++	__u8  bDescriptorSubType;
++	__u8  bFormatIndex;
++	__u8  bNumFrameDescriptors;
++	__u8  guidFormat[16];
++	__u8  bBitsPerPixel;
++	__u8  bDefaultFrameIndex;
++	__u8  bAspectRatioX;
++	__u8  bAspectRatioY;
++	__u8  bmInterfaceFlags;
++	__u8  bCopyProtect;
++	__u8  bVariableSize;
++} __attribute__((__packed__));
++
++#define UVC_DT_FORMAT_FRAMEBASED_SIZE			28
++
++/* Frame Based Payload - 3.1.2. Frame Based Video Frame Descriptor */
++struct uvc_frame_framebased {
++	__u8  bLength;
++	__u8  bDescriptorType;
++	__u8  bDescriptorSubType;
++	__u8  bFrameIndex;
++	__u8  bmCapabilities;
++	__u16 wWidth;
++	__u16 wHeight;
++	__u32 dwMinBitRate;
++	__u32 dwMaxBitRate;
++	__u32 dwDefaultFrameInterval;
++	__u8  bFrameIntervalType;
++	__u32 dwBytesPerLine;
++	__u32 dwFrameInterval[];
++} __attribute__((__packed__));
++
++#define UVC_DT_FRAME_FRAMEBASED_SIZE(n)               (26 + 4 * (n))
++
++#define UVC_FRAME_FRAMEBASED(n)	\
++	uvc_frame_framebased_##n
++
++#define DECLARE_UVC_FRAME_FRAMEBASED(_n)	\
++typeof(_n) n = (_n);			\
++struct UVC_FRAME_FRAMEBASED(n) {	\
++	__u8  bLength;			\
++	__u8  bDescriptorType;		\
++	__u8  bDescriptorSubType;	\
++	__u8  bFrameIndex;		\
++	__u8  bmCapabilities;		\
++	__u16 wWidth;			\
++	__u16 wHeight;			\
++	__u32 dwMinBitRate;		\
++	__u32 dwMaxBitRate;		\
++	__u32 dwDefaultFrameInterval;	\
++	__u8  bFrameIntervalType;	\
++	__u32 dwBytesPerLine;		\
++	__u32 dwFrameInterval[n];	\
++} __attribute__ ((packed))
++
+ #endif /* __LINUX_USB_VIDEO_H */
+ 

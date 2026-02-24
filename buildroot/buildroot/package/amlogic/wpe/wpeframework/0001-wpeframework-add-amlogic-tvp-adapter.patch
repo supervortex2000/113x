@@ -1,0 +1,169 @@
+From 9c2719ca04bb599794445284a790b0186617d991 Mon Sep 17 00:00:00 2001
+From: Xueling Li <xueling.li@amlogic.com>
+Date: Wed, 2 Dec 2020 05:20:44 +0000
+Subject: [PATCH] aml-tvp
+
+---
+ .../adapter/amlogic-tvp/open_cdm_adapter.cpp  | 150 ++++++++++++++++++
+ 1 file changed, 150 insertions(+)
+ create mode 100644 Source/ocdm/adapter/amlogic-tvp/open_cdm_adapter.cpp
+
+diff --git a/Source/ocdm/adapter/amlogic-tvp/open_cdm_adapter.cpp b/Source/ocdm/adapter/amlogic-tvp/open_cdm_adapter.cpp
+new file mode 100644
+index 00000000..8abf09b0
+--- /dev/null
++++ b/Source/ocdm/adapter/amlogic-tvp/open_cdm_adapter.cpp
+@@ -0,0 +1,150 @@
++
++#include "open_cdm_adapter.h"
++#include <stdlib.h>
++#include <gst/gst.h>
++#include <gst/base/gstbytereader.h>
++
++OpenCDMError opencdm_gstreamer_session_decrypt(struct OpenCDMSession* session, GstBuffer* buffer, GstBuffer* subSampleBuffer, const uint32_t subSampleCount,
++                                               GstBuffer* IV, GstBuffer* keyID, uint32_t initWithLast15)
++{
++    OpenCDMError result (ERROR_INVALID_SESSION);
++
++    if (session != nullptr) {
++        GstMapInfo dataMap;
++        GstMapFlags flags = (GstMapFlags)GST_MAP_READWRITE;
++        uint32_t secureHandle = 0;
++        GstProtectionMeta *meta = gst_buffer_get_protection_meta(buffer);
++        if (meta) {
++            GstStructure *secmem = meta->info;
++            gst_structure_get(secmem, "handle", G_TYPE_INT, &secureHandle, NULL);
++        }
++
++        if (secureHandle) {
++            flags = GST_MAP_READ;
++        }
++
++        if (gst_buffer_map(buffer, &dataMap, flags) == false) {
++            printf("Invalid buffer.\n");
++            return (ERROR_INVALID_DECRYPT_BUFFER);
++        }
++
++        GstMapInfo ivMap;
++        if (gst_buffer_map(IV, &ivMap, (GstMapFlags) GST_MAP_READ) == false) {
++            gst_buffer_unmap(buffer, &dataMap);
++            printf("Invalid IV buffer.\n");
++            return (ERROR_INVALID_DECRYPT_BUFFER);
++        }
++
++        uint8_t *mappedKeyID = nullptr;
++        uint32_t mappedKeyIDSize = 0;
++
++        GstMapInfo keyIDMap;
++        if (keyID != nullptr) {
++           if (gst_buffer_map(keyID, &keyIDMap, (GstMapFlags) GST_MAP_READ) == false) {
++               gst_buffer_unmap(buffer, &dataMap);
++               gst_buffer_unmap(IV, &ivMap);
++               printf("Invalid keyID buffer.\n");
++               return (ERROR_INVALID_DECRYPT_BUFFER);
++           }
++
++           mappedKeyID = reinterpret_cast<uint8_t* >(keyIDMap.data);
++           mappedKeyIDSize =  static_cast<uint32_t >(keyIDMap.size);
++        }
++
++        uint8_t *mappedData = reinterpret_cast<uint8_t* >(dataMap.data);
++        uint32_t mappedDataSize = static_cast<uint32_t >(dataMap.size);
++        uint8_t *mappedIV = reinterpret_cast<uint8_t* >(ivMap.data);
++        uint32_t mappedIVSize = static_cast<uint32_t >(ivMap.size);
++        if (subSampleBuffer != nullptr) {
++            GstMapInfo sampleMap;
++            if (gst_buffer_map(subSampleBuffer, &sampleMap, GST_MAP_READ) == false) {
++                printf("Invalid subsample buffer.\n");
++                if (keyID != nullptr) {
++                   gst_buffer_unmap(keyID, &keyIDMap);
++                }
++                gst_buffer_unmap(IV, &ivMap);
++                gst_buffer_unmap(buffer, &dataMap);
++                return (ERROR_INVALID_DECRYPT_BUFFER);
++            }
++            uint32_t magicValue = 0x5ec00ce5;
++            uint8_t *mappedSubSample = reinterpret_cast<uint8_t* >(sampleMap.data);
++            uint32_t mappedSubSampleSize = static_cast<uint32_t >(sampleMap.size);
++            GstByteReader* reader = gst_byte_reader_new(mappedSubSample, mappedSubSampleSize);
++            uint16_t inClear = 0;
++            uint32_t inEncrypted = 0;
++            uint32_t totalDataSize = mappedDataSize + sizeof(magicValue) + sizeof(secureHandle) + sizeof(subSampleCount)
++                    + subSampleCount * (sizeof(inClear) + sizeof(inEncrypted));
++
++            uint8_t* encryptedData = reinterpret_cast<uint8_t*> (malloc(totalDataSize));
++            uint8_t* encryptedDataIter = encryptedData;
++
++
++            if (secureHandle) {
++                memcpy(encryptedDataIter, &magicValue, sizeof(magicValue));
++                encryptedDataIter += sizeof(magicValue);
++
++                memcpy(encryptedDataIter, &secureHandle, sizeof(secureHandle));
++                encryptedDataIter += sizeof(secureHandle);
++
++                memcpy(encryptedDataIter, &subSampleCount, sizeof(subSampleCount));
++                encryptedDataIter += sizeof(subSampleCount);
++
++                for (unsigned int position = 0; position < subSampleCount; position++) {
++                    gst_byte_reader_get_uint16_be(reader, &inClear);
++                    gst_byte_reader_get_uint32_be(reader, &inEncrypted);
++
++                    memcpy(encryptedDataIter, &inClear, sizeof(inClear));
++                    encryptedDataIter += sizeof(inClear);
++
++                    memcpy(encryptedDataIter, &inEncrypted, sizeof(inEncrypted));
++                    encryptedDataIter += sizeof(inEncrypted);
++
++                }
++                memcpy(encryptedDataIter, mappedData, mappedDataSize);
++            } else {
++                uint32_t index = 0;
++                totalDataSize = 0;
++                for (unsigned int position = 0; position < subSampleCount; position++) {
++
++                    gst_byte_reader_get_uint16_be(reader, &inClear);
++                    gst_byte_reader_get_uint32_be(reader, &inEncrypted);
++
++                    memcpy(encryptedDataIter, mappedData + index + inClear, inEncrypted);
++                    index += inClear + inEncrypted;
++                    encryptedDataIter += inEncrypted;
++                    totalDataSize += inEncrypted;
++                }
++            }
++
++            gst_byte_reader_set_pos(reader, 0);
++
++            result = opencdm_session_decrypt(session, encryptedData, totalDataSize, mappedIV, mappedIVSize, mappedKeyID, mappedKeyIDSize, initWithLast15);
++            if (!secureHandle) {
++                uint32_t index = 0;
++                unsigned total = 0;
++                for (uint32_t position = 0; position < subSampleCount; position++) {
++                    gst_byte_reader_get_uint16_be(reader, &inClear);
++                    gst_byte_reader_get_uint32_be(reader, &inEncrypted);
++
++                    memcpy(mappedData + total + inClear, encryptedData + index, inEncrypted);
++                    index += inEncrypted;
++                    total += inClear + inEncrypted;
++                }
++            }
++            gst_byte_reader_free(reader);
++            free(encryptedData);
++            gst_buffer_unmap(subSampleBuffer, &sampleMap);
++        } else {
++            result = opencdm_session_decrypt(session, mappedData, mappedDataSize,  mappedIV, mappedIVSize, mappedKeyID, mappedKeyIDSize, initWithLast15);
++        }
++
++        if (keyID != nullptr) {
++           gst_buffer_unmap(keyID, &keyIDMap);
++        }
++
++        gst_buffer_unmap(IV, &ivMap);
++        gst_buffer_unmap(buffer, &dataMap);
++    }
++
++    return (result);
++}
+-- 
+2.17.1
+

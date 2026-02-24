@@ -1,0 +1,29 @@
+diff --git a/DIALServer/DIALServer.config b/DIALServer/DIALServer.config
+index 9acbd6e..c9576f4 100644
+--- a/DIALServer/DIALServer.config
++++ b/DIALServer/DIALServer.config
+@@ -3,7 +3,7 @@ set (autostart ${PLUGIN_DIALSERVER_AUTOSTART})
+ set (preconditions Platform, Network)
+ 
+ function(add_app config)
+-    set(oneValueArgs NAME CALLSIGN RUNTIME URL DATA)
++    set(oneValueArgs NAME CALLSIGN RUNTIME URL DATA HIDE)
+ 
+     cmake_parse_arguments(PARSE_ARGV 1
+             Argument "${optionsArgs}" "${oneValueArgs}" "${multiValueArgs}")
+@@ -19,6 +19,7 @@ function(add_app config)
+         kv(callsign ${Argument_CALLSIGN})
+         kv(runtimechange ${Argument_RUNTIME})
+     endif()
++		kv(hide ${Argument_HIDE})
+         kv(url ${Argument_URL})
+         if(Argument_DATA)
+             kv(additionaldata ${Argument_DATA})
+@@ -52,6 +53,7 @@ if("${PLUGIN_DIALSERVER_ENABLE_YOUTUBE}")
+             NAME YouTube
+             CALLSIGN ${PLUGIN_DIALSERVER_YOUTUBE_CALLSIGN}
+             RUNTIME  true
++			HIDE true
+             URL "https://www.youtube.com/tv")
+     elseif("${PLUGIN_DIALSERVER_YOUTUBE_MODE}" STREQUAL "passive")
+         add_app(  ${configuration}

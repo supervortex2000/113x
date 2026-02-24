@@ -1,0 +1,9 @@
+config BR2_PACKAGE_V4L2_UVM_VDIN_TEST
+        bool "v4l2_uvm_vdin_test"
+        select BR2_PACKAGE_LIBDRM
+        select BR2_PACKAGE_FFMPEG
+        select BR2_PACKAGE_AV_SYNC_LIB
+        select BR2_PACKAGE_AML_TVSERVER
+        help
+          Test application for v4l2 decoder using DRM-GEM UVM buffer.
+          http://openlinux.amlogic.com

@@ -1,0 +1,4 @@
+config BR2_PACKAGE_AML_LIBJPEG_TEST
+  bool "aml libjpeg test"
+  help
+    aml libjpeg test application

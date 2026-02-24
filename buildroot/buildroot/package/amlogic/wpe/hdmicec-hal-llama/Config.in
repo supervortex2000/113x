@@ -1,0 +1,6 @@
+menuconfig BR2_PACKAGE_HDMICEC_HAL_LLAMA
+	bool "hdmicec-hal-llama"
+	select BR2_PACKAGE_HDMICEC_HEADER
+	help
+	   rdk hdmicec-hal-llama.
+

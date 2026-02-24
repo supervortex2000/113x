@@ -1,0 +1,12 @@
+config BR2_PACKAGE_PLAYREADY_BIN
+        bool "playready prebuilt"
+        select BR2_PACKAGE_TDK
+        help
+          playready prebuilt files.
+
+config BR2_PACKAGE_PLAYREADY_BIN_VERSION
+        string "playready prebuild version"
+        default ""
+        help
+          playready prebuilt version
+

@@ -1,0 +1,9 @@
+menuconfig BR2_PACKAGE_IARMBUS
+	bool "iarmbas"
+	select BR2_PACKAGE_LIBGLIB2
+	select B22_PACKAGE_LIBXML2
+	select BR2_PACKAGE_DBUS
+	select BR2_PACKAGE_LIBPLAYER
+	help
+	   rdk iarmbas.
+

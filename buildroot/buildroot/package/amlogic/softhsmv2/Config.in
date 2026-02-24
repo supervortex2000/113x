@@ -1,0 +1,9 @@
+config BR2_PACKAGE_SOFTHSMV2
+	bool "softhsmv2"
+	select BR2_PACKAGE_OPENSSL
+	help
+		SOFTHSMV2.
+
+config BR2_PACKAGE_SOFTHSMV2_SITE
+    string "softhsmv2 path"
+    default "$(TOPDIR)/../multimedia/SoftHSMv2"

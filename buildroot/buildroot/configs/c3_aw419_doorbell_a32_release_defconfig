@@ -1,0 +1,16 @@
+#----------------------------------------------------------#
+#include "arch_a32_10.3.config"
+
+#----------------------------------------------------------#
+#include "c3_aw401.config"
+#
+#include "arm_rtos_sdk.config"
+BR2_LINUX_KERNEL_INTREE_DTS_NAME="c3_c308l_aw419"
+BR2_TARGET_UBOOT_BOARDNAME="c3_aw419"
+
+BR2_ROOTFS_UPGRADE_DIR="board/amlogic/common/upgrade/upgrade-c3-doorbell"
+
+BR2_PACKAGE_AML_ARM_RTOS_SDK_BUILD_OPTION="arm64 c3 aw419_c308l fastboot"
+
+#include "flash_nand_2k.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesonc3_aw401/initramfs/ramfslist-32-ubi-release"

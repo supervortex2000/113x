@@ -1,0 +1,5 @@
+config BR2_PACKAGE_GST_PLUGIN_AML_VSINK
+    bool "gst-plugin-aml-vsink"
+    depends on BR2_PACKAGE_LIBDRM && BR2_PACKAGE_GSTREAMER1 && BR2_PACKAGE_AVSYNC_LIB && BR2_PACKAGE_LIBDRM_MESON && BR2_PACKAGE_GST_PLUGIN_AML_ASINK
+    help
+        gstreamer plugin for video layer rendering only

@@ -1,0 +1,6 @@
+config BR2_PACKAGE_IPC_IRCUT_MODULE
+	bool "ircut kernel driver"
+	depends on BR2_LINUX_KERNEL
+	help
+	  ircut module kernel driver
+

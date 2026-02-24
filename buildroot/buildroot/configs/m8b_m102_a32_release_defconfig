@@ -1,0 +1,9 @@
+#----------------------------------------------------------#
+#include "arch_a32_6.3.1.config"
+
+#----------------------------------------------------------#
+#BR2_LINUX_KERNEL_USE_DEFCONFIG=n
+#BR2_LINUX_KERNEL_USE_CUSTOM_CONFIG=y
+#BR2_LINUX_KERNEL_CUSTOM_CONFIG_FILE="$(TOPDIR)/../kernel/aml-4.9-q-m805/arch/arm/configs/meson32_m805_defconfig"
+#include "m8b_m102.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesonm8b_m102/initramfs/ramfslist-32-ubi-release"

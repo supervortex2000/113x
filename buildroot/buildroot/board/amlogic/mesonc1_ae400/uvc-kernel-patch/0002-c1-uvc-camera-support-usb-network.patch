@@ -1,0 +1,31 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-c1-c308x-ae400.dts b/arch/arm64/boot/dts/amlogic/meson-c1-c308x-ae400.dts
+index f8a6340..00c9708 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-c1-c308x-ae400.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-c1-c308x-ae400.dts
+@@ -1257,7 +1257,16 @@
+ &dwc2_a {
+ 	status = "okay";
+ 	/** 0: normal, 1: otg+dwc3 host only, 2: otg+dwc3 device only*/
+-	controller-type = <3>;
++	controller-type = <2>;
++	ep_fifo_configration = <1>;
++	rx_fifo_size = <280>;
++	dev_nperio_tx_fifo_size = <16>;
++	tx_fifo_size_0 = <128>;
++	tx_fifo_size_1 = <16>;
++	tx_fifo_size_2 = <16>;
++	tx_fifo_size_3 = <192>;
++	tx_fifo_size_4 = <64>;
++	tx_fifo_size_5 = <16>;
+ };
+ 
+ &usb0 {
+@@ -1273,7 +1282,7 @@
+ &usb3_phy_v2 {
+ 	status = "okay";
+ 	portnum = <0>;
+-	otg = <1>;
++	otg = <0>;
+ 	gpio-vbus-power = "GPIOD_9";
+ 	gpios = <&gpio GPIOD_9 GPIO_ACTIVE_HIGH>;
+ };

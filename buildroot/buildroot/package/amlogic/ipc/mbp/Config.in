@@ -1,0 +1,9 @@
+menu "mbp"
+source "package/amlogic/ipc/mbp/osal/Config.in"
+source "package/amlogic/ipc/mbp/pmz/Config.in"
+source "package/amlogic/ipc/mbp/mbd/Config.in"
+source "package/amlogic/ipc/mbp/mbi/Config.in"
+source "package/amlogic/ipc/mbp/sample/Config.in"
+source "package/amlogic/ipc/mbp/sensor/Config.in"
+source "package/amlogic/ipc/mbp/tool/Config.in"
+endmenu

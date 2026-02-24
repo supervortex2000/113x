@@ -1,0 +1,10 @@
+#!/bin/sh
+mount_point="mmcblk0p1"
+
+if [ -n $mount_point ];then
+    umount -l /media/$mount_point
+    ret=$?
+    if [ $ret -eq 0 ];then
+        rm -r /media/$mount_point
+    fi
+fi

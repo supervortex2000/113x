@@ -1,0 +1,11 @@
+#----------------------------------------------------------#
+#include "arch_a64_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "t5w_at301.config"
+#include "flash_emmc.config"
+
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesont5w_at301/initramfs/ramfslist-64"
+
+BR2_PACKAGE_COBALT=n
+BR2_TARGET_ROOTFS_EXT2_SIZE="1024M"

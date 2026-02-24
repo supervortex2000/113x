@@ -1,0 +1,9 @@
+config BR2_PACKAGE_AML_NN_DETECT
+    bool "aml nn_detect"
+    depends on BR2_PACKAGE_NPU
+    help
+        Support nn detection base library
+
+if BR2_PACKAGE_AML_NN_DETECT
+source "package/amlogic/aml-nn-detect-library/aml-nn-detect-model/Config.in"
+endif

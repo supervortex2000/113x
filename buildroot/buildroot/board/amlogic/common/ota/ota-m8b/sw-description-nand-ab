@@ -1,0 +1,36 @@
+software =
+{
+	version = "1.0.1";
+	hardware-compatibility: [ "1.0" ];
+	images: (
+		{
+			filename = "rootfs.ubifs";
+			volume = "rootfs";
+		},
+		{
+			filename = "dtb.img";
+			device = "/dev/dtb";
+		},
+		{
+			filename = "boot.img";
+			device = "/dev/boot";
+			type = "flash";
+		},
+        {
+			filename = "u-boot.bin";
+			device = "/dev/bootloader";
+        }
+	);
+	scripts: (
+		{
+			filename = "update.sh";
+			type = "shellscript";
+		}
+	);
+	uboot: (
+		{
+			name = "upgrade_step";
+			value = "1";
+		}
+	);
+}

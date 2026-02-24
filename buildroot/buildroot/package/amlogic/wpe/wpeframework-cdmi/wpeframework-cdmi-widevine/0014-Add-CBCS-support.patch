@@ -1,0 +1,77 @@
+From f99300190cc6a40fcb03ffe736966c2c9c6149d0 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Fri, 22 Jan 2021 14:41:10 +0800
+Subject: [PATCH] Add CBCS support
+
+---
+ MediaSession.cpp | 29 +++++++++++++++++++++++------
+ 1 file changed, 23 insertions(+), 6 deletions(-)
+
+diff --git a/MediaSession.cpp b/MediaSession.cpp
+index 11ec616..a4523a2 100644
+--- a/MediaSession.cpp
++++ b/MediaSession.cpp
+@@ -311,6 +311,9 @@ CDMi_RESULT MediaKeySession::Decrypt(
+     const uint8_t* keyId,
+     bool /* initWithLast15 */)
+ {
++  uint32_t encryption_scheme = 0; // default is for cenc
++  uint32_t crypt_byte_block = 0;
++  uint32_t skip_byte_block = 0;
+   g_lock.Lock();
+   widevine::Cdm::KeyStatusMap map;
+   std::string keyStatus;
+@@ -318,6 +321,14 @@ CDMi_RESULT MediaKeySession::Decrypt(
+   CDMi_RESULT status = CDMi_S_FALSE;
+   *f_pcbOpaqueClearContent = 0;
+ 
++  {
++    // Read encryption_scheme and pattern
++    memcpy(&encryption_scheme, f_pbIV+(f_cbIV-12), 4);
++    memcpy(&crypt_byte_block, f_pbIV+(f_cbIV-8), 4);
++    memcpy(&skip_byte_block, f_pbIV+(f_cbIV-4), 4);
++    f_cbIV -= 12;
++  }
++
+   memcpy(m_IV, f_pbIV, (f_cbIV > 16 ? 16 : f_cbIV));
+   if (f_cbIV < 16) {
+     memset(&(m_IV[f_cbIV]), 0, 16 - f_cbIV);
+@@ -400,11 +411,14 @@ CDMi_RESULT MediaKeySession::Decrypt(
+         decryptionBatch.key_id_length = keyIdLength;
+         decryptionBatch.samples = &decryptSample;
+         decryptionBatch.samples_length = 1;
+-        decryptionBatch.pattern.encrypted_blocks = 0;
+-        decryptionBatch.pattern.clear_blocks = 0;
++        decryptionBatch.pattern.encrypted_blocks = crypt_byte_block;
++        decryptionBatch.pattern.clear_blocks = skip_byte_block;
+         decryptionBatch.is_secure = ((reinterpret_cast<uint8_t*>(secureHandle)) != nullptr);
+         decryptionBatch.is_video = ((reinterpret_cast<uint8_t*>(secureHandle)) != nullptr);
+-        decryptionBatch.encryption_scheme = widevine::Cdm::EncryptionScheme::kAesCtr;
++        if (encryption_scheme == 1) // for CBCS
++          decryptionBatch.encryption_scheme = widevine::Cdm::EncryptionScheme::kAesCbc;
++        else
++          decryptionBatch.encryption_scheme = widevine::Cdm::EncryptionScheme::kAesCtr;
+ 	    if (widevine::Cdm::kSuccess != m_cdm->decrypt(decryptionBatch)) {
+ 			printf("line:%d decryption failed\n", __LINE__);
+ 		}else{
+@@ -443,11 +457,14 @@ CDMi_RESULT MediaKeySession::Decrypt(
+         decryptionBatch.key_id_length = keyIdLength;
+         decryptionBatch.samples = &decryptSample;
+         decryptionBatch.samples_length = 1;
+-        decryptionBatch.pattern.encrypted_blocks = 0;
+-        decryptionBatch.pattern.clear_blocks = 0;
++        decryptionBatch.pattern.encrypted_blocks = crypt_byte_block;
++        decryptionBatch.pattern.clear_blocks = skip_byte_block;
+         decryptionBatch.is_secure = false;
+         decryptionBatch.is_video = false;
+-        decryptionBatch.encryption_scheme = widevine::Cdm::EncryptionScheme::kAesCtr;
++        if (encryption_scheme == 1) // for CBCS
++          decryptionBatch.encryption_scheme = widevine::Cdm::EncryptionScheme::kAesCbc;
++        else
++          decryptionBatch.encryption_scheme = widevine::Cdm::EncryptionScheme::kAesCtr;
+         if (widevine::Cdm::kSuccess == m_cdm->decrypt(decryptionBatch)) {
+           *f_pcbOpaqueClearContent = decryptionBatch.samples[0].output.data_length;
+           *f_ppbOpaqueClearContent = static_cast<uint8_t *>(decryptionBatch.samples[0].output.data);
+-- 
+2.7.4
+

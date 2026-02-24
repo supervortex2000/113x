@@ -1,0 +1,15 @@
+config BR2_PACKAGE_AML_NN_AIAUDIO_LIBRARY
+    bool "aml nn_audio library"
+    help
+        Support nn audio library
+    depends on BR2_PACKAGE_NPU
+
+if BR2_PACKAGE_AML_NN_AIAUDIO_LIBRARY
+menu "model sopport"
+source "package/amlogic/aml-nn-aiaudio-library/aml-nn-aiaudio/Config.in"
+source "package/amlogic/aml-nn-aiaudio-library/aml-nn-aiaudio-demo/Config.in"
+source "package/amlogic/aml-nn-aiaudio-library/aml-nn-aiaudio-model/Config.in"
+endmenu
+endif
+
+

@@ -1,0 +1,111 @@
+From de11e5ea3bdb1b448a8775906c49d0eb61ba899b Mon Sep 17 00:00:00 2001
+From: arun-madhavan-013 <arun_madhavan@comcast.com>
+Date: Mon, 7 Sep 2020 21:42:14 +0530
+Subject: [PATCH 2/2] Removed RFC dependency of RDKShell
+
+---
+ RDKShell/CMakeLists.txt | 11 ++++++++++-
+ RDKShell/RDKShell.cpp   |  8 ++++++++
+ 2 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/RDKShell/CMakeLists.txt b/RDKShell/CMakeLists.txt
+index 098c838..3e0f48e 100755
+--- a/RDKShell/CMakeLists.txt
++++ b/RDKShell/CMakeLists.txt
+@@ -18,6 +18,7 @@
+ set(PLUGIN_NAME RDKShell)
+ set(MODULE_NAME ${NAMESPACE}${PLUGIN_NAME})
+ option(ENABLE_RDKSHELL_SECURITY_TOKEN "ENABLE_RDKSHELL_SECURITY_TOKEN" OFF)
++option(ENABLE_RFC_API "ENABLE_RFC_API" OFF)
+ 
+ find_package(${NAMESPACE}Plugins REQUIRED)
+ 
+@@ -25,6 +26,10 @@ if (ENABLE_RDKSHELL_SECURITY_TOKEN)
+     add_definitions(-DENABLE_SECURITY_TOKEN)
+ endif (ENABLE_RDKSHELL_SECURITY_TOKEN)
+ 
++if (ENABLE_RFC_API)
++    add_definitions(-DENABLE_RFC_API)
++endif (ENABLE_RFC_API)
++
+ add_library(${MODULE_NAME} SHARED
+         RDKShell.cpp
+         Module.cpp
+@@ -39,7 +44,11 @@ target_include_directories(${MODULE_NAME} PRIVATE ../helpers)
+ set(RDKSHELL_INCLUDES $ENV{RDKSHELL_INCLUDES})
+ separate_arguments(RDKSHELL_INCLUDES)
+ include_directories(BEFORE ${RDKSHELL_INCLUDES})
+-target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins -lrdkshell rfcapi)
++target_link_libraries(${MODULE_NAME} PRIVATE ${NAMESPACE}Plugins::${NAMESPACE}Plugins -lrdkshell)
++
++if (ENABLE_RFC_API)
++    target_link_libraries(${MODULE_NAME} PRIVATE rfcapi)
++endif (ENABLE_RFC_API)
+ 
+ install(TARGETS ${MODULE_NAME}
+         DESTINATION lib/${STORAGE_DIRECTORY}/plugins)
+diff --git a/RDKShell/RDKShell.cpp b/RDKShell/RDKShell.cpp
+index 24a4285..37548b7 100755
+--- a/RDKShell/RDKShell.cpp
++++ b/RDKShell/RDKShell.cpp
+@@ -29,7 +29,9 @@
+ #include <rdkshell/compositorcontroller.h>
+ #include <rdkshell/application.h>
+ #include <interfaces/IMemory.h>
++#ifdef ENABLE_RFC_API
+ #include "rfcapi.h"
++#endif /* ENABLE_RFC_API */
+ 
+ const short WPEFramework::Plugin::RDKShell::API_VERSION_NUMBER_MAJOR = 1;
+ const short WPEFramework::Plugin::RDKShell::API_VERSION_NUMBER_MINOR = 0;
+@@ -143,6 +145,7 @@ namespace WPEFramework {
+           return flag;
+         }
+ 
++#ifdef ENABLE_RFC_API 
+         bool getRFCConfig(char* paramName, RFC_ParamData_t& paramOutput)
+         {
+           WDMP_STATUS wdmpStatus = getRFCParameter("RDKShell", paramName, &paramOutput);
+@@ -152,6 +155,7 @@ namespace WPEFramework {
+           }
+           return false;
+         }
++#endif /* ENABLE_RFC_API */
+ 
+         SERVICE_REGISTRATION(RDKShell, 1, 0);
+ 
+@@ -280,6 +284,7 @@ namespace WPEFramework {
+ 
+             mCurrentService = service;
+             CompositorController::setEventListener(mEventListener);
++#ifdef ENABLE_RFC_API
+             RFC_ParamData_t param;
+             bool ret = getRFCConfig("Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.Power.UserInactivityNotification.Enable", param);
+             if (true == ret && param.type == WDMP_BOOLEAN && (strncasecmp(param.value,"true",4) == 0))
+@@ -298,6 +303,7 @@ namespace WPEFramework {
+                 }
+               }
+             }
++#endif /* ENABLE_RFC_API */
+ 
+             service->Register(mClientsMonitor);
+ 
+@@ -370,6 +376,7 @@ namespace WPEFramework {
+                 
+                 // Thunder Security is enabled by Default.
+                 bool thunderSecurityRFCEnabled = true;
++#ifdef ENABLE_RFC_API
+                 RFC_ParamData_t param;
+                 if (getRFCConfig("Device.DeviceInfo.X_RDKCENTRAL-COM_RFC.Feature.ThunderSecurity.Enable", param))
+                 {
+@@ -378,6 +385,7 @@ namespace WPEFramework {
+                         thunderSecurityRFCEnabled = false;
+                     }
+                 }
++#endif /* ENABLE_RFC_API */
+                 std::cout << "Thunder Security RFC enabled: " << thunderSecurityRFCEnabled << std::endl;
+                 if(!isThunderSecurityConfigured() || !thunderSecurityRFCEnabled)
+                 {
+-- 
+2.24.0.windows.2
+

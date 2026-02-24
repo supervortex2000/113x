@@ -1,0 +1,6 @@
+config BR2_PACKAGE_AML_QT_LAUNCHER
+    bool "aml-qt-launcher"
+    select BR2_PACKAGE_QT5BASE
+    select BR2_PACKAGE_QT5MULTIMEDIA
+    help
+      When bootup, start QT launcher demo directly without boot animation

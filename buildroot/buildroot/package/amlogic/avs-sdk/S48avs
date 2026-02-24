@@ -1,0 +1,14 @@
+#!/bin/sh
+
+
+iptables-restore < /etc/rules.txt 
+
+#softhsm2-util --init-token --slot 0 --label "avs-token" --so-pin 5462 --pin 778833
+
+export HOME_PATH="/var/app/alexa-release"
+
+chmod 777 ${HOME_PATH}/init.sh
+${HOME_PATH}/init.sh
+
+
+

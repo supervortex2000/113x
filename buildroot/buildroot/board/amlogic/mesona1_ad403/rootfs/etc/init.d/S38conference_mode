@@ -1,0 +1,16 @@
+uac_sys_status_file=/sys/devices/platform/audiobridge/bridge0/bridge_uac_status
+dsp_speaker_process_file=/sys/devices/platform/audiobridge/bridge1/bridge_playback_process_ctr
+while [ 1 ]
+do
+	if [[ -e $uac_sys_status_file ]] && [[ -e $dsp_speaker_process_file ]];then
+		uac_status=$(cat $uac_sys_status_file)
+		if [ $uac_status == "1" ];then
+			amixer cset numid=3 240 > /dev/null
+			echo 1 > $dsp_speaker_process_file
+		else
+			amixer cset numid=3 255 > /dev/null
+			echo 0 > $dsp_speaker_process_file
+		fi
+	fi
+	sleep 1
+done&

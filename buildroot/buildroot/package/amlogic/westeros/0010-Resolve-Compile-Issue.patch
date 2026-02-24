@@ -1,0 +1,72 @@
+From 7a701913239bbfa418bd85f9ef5125c90182eb19 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Fri, 4 Dec 2020 08:46:10 +0800
+Subject: [PATCH] Resolve Compile Issue Add the dependency about
+ libwesteros_linux_dmabuf_server.la
+
+---
+ Makefile.am | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index 06af38f..94f428b 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -25,7 +25,7 @@ AM_CXXFLAGS= \
+ 	-I$(top_srcdir)/include \
+    -I${PKG_CONFIG_SYSROOT_DIR}/$(includedir)/wayland \
+    $(WAYLAND_CLIENT_CFLAGS) $(WAYLAND_SERVER_CFLAGS) \
+-   $(XKBCOMMON_CFLAGS)   
++   $(XKBCOMMON_CFLAGS)
+ AM_LDFLAGS=$(WAYLANDLIB)
+ 
+ ## --- Configurtion -------
+@@ -78,10 +78,10 @@ endif
+ 
+ BUILT_SOURCES += libwesteros_compositor.la \
+                  libwesteros_render_embedded.la
+-               
++
+ if ENABLE_WESTEROS_RENDERERGL
+ BUILT_SOURCES += libwesteros_render_gl.la
+-endif               
++endif
+ 
+ bin_PROGRAMS =
+ 
+@@ -126,7 +126,7 @@ westeros_test_LDFLAGS= \
+    -lEGL
+ if !ENABLE_PLATFORM_EMBEDDED
+ westeros_test_LDFLAGS += -lGL -lGLEW
+-endif   
++endif
+ 
+ ## --- Sample player -------
+ westeros_player_SOURCES = westeros-player.cpp
+@@ -187,6 +187,7 @@ libwesteros_compositor_la_LDFLAGS += -lwesteros_simplebuffer_server
+ endif
+ 
+ if ENABLE_WESTEROS_LDBPROTOCOL
++libwesteros_compositor_la_DEPENDENCIES = libwesteros_linux_dmabuf_server.la
+ libwesteros_compositor_la_LDFLAGS += -lwesteros_linux_dmabuf_server
+ endif
+ 
+@@ -202,6 +203,7 @@ if ENABLE_WESTEROS_SBPROTOCOL
+ libwesteros_render_gl_la_LDFLAGS += -lwesteros_simplebuffer_server
+ endif
+ if ENABLE_WESTEROS_LDBPROTOCOL
++libwesteros_render_gl_la_DEPENDENCIES = libwesteros_linux_dmabuf_server.la
+ libwesteros_render_gl_la_LDFLAGS += -lwesteros_linux_dmabuf_server
+ endif
+ 
+@@ -217,6 +219,7 @@ if ENABLE_WESTEROS_SBPROTOCOL
+ libwesteros_render_embedded_la_LDFLAGS += -lwesteros_simplebuffer_server
+ endif
+ if ENABLE_WESTEROS_LDBPROTOCOL
++libwesteros_render_embedded_la_DEPENDENCIES = libwesteros_linux_dmabuf_server.la
+ libwesteros_render_embedded_la_LDFLAGS += -lwesteros_linux_dmabuf_server
+ endif
+ 
+-- 
+2.7.4
+

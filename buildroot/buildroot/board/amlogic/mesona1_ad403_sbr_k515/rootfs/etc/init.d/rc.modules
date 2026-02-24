@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Copyright (c) 2023 Amlogic, Inc. All rights reserved.
+# This source code is subject to the terms and conditions defined
+# in the file 'LICENSE' which is part of this source code package.
+# Description:  rc modules file
+#
+# Make sure module dependencies are up to date.
+depmod
+if [ -f /amlogic/modules/vendor/vendor_install.sh ]; then
+    cd /amlogic/modules/vendor/
+    /amlogic/modules/vendor/vendor_install.sh
+    cd -
+fi
+
+# Load modules specified in the configuration file.
+# ---------------------------------------------------
+CONF=/etc/modules
+# Do nothing if the modules file is missing.
+if [ ! -f $CONF ]; then
+    exit 0
+fi
+# Read the configuration file and load the modules.
+cat $CONF | grep -v "^#" | while read file
+do
+    # Do this quietly (-q doesn't ignore errors)
+    modprobe $file 2> /dev/null
+done
+

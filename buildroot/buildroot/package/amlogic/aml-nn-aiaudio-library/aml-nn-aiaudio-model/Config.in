@@ -1,0 +1,4 @@
+config BR2_PACKAGE_AML_NN_AIAUDIO_MODEL
+    bool "aml nn_aiaudio model library"
+    help
+        Support detect model

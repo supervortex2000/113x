@@ -1,0 +1,230 @@
+From bac6ac04188d343356db653e77119d9e93e7a054 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Wed, 23 Jun 2021 15:53:23 +0800
+Subject: [PATCH] Add launch type for Youtube
+
+Change-Id: I93d8e745f34bff00635f1a793aa5fa71cfc8e44f
+---
+ Source/WPEFramework/Controller.h          |  1 +
+ Source/WPEFramework/ControllerJsonRpc.cpp | 39 +++++++++
+ Source/WPEFramework/PluginServer.cpp      | 96 ++++++++++++++++++++++-
+ Source/WPEFramework/PluginServer.h        |  5 +-
+ 4 files changed, 138 insertions(+), 3 deletions(-)
+
+diff --git a/Source/WPEFramework/Controller.h b/Source/WPEFramework/Controller.h
+index c7b2234c..6fdadc2a 100644
+--- a/Source/WPEFramework/Controller.h
++++ b/Source/WPEFramework/Controller.h
+@@ -288,6 +288,7 @@ namespace Plugin {
+         uint32_t get_environment(const string& index, Core::JSON::String& response) const;
+         uint32_t get_configuration(const string& index, Core::JSON::String& response) const;
+         uint32_t set_configuration(const string& index, const Core::JSON::String& params);
++        uint32_t set_configUrl(const string& index, const Core::JSON::String& params);
+         void event_all(const string& callsign, const Core::JSON::String& data);
+         void event_statechange(const string& callsign, const PluginHost::IShell::state& state, const PluginHost::IShell::reason& reason);
+ 
+diff --git a/Source/WPEFramework/ControllerJsonRpc.cpp b/Source/WPEFramework/ControllerJsonRpc.cpp
+index 7a0f38f6..6065cb7d 100644
+--- a/Source/WPEFramework/ControllerJsonRpc.cpp
++++ b/Source/WPEFramework/ControllerJsonRpc.cpp
+@@ -46,6 +46,7 @@ namespace Plugin {
+         Property<Core::JSON::ArrayType<PluginHost::MetaData::Bridge>>(_T("discoveryresults"), &Controller::get_discoveryresults, nullptr, this);
+         Property<Core::JSON::String>(_T("environment"), &Controller::get_environment, nullptr, this);
+         Property<Core::JSON::String>(_T("configuration"), &Controller::get_configuration, &Controller::set_configuration, this);
++        Property<Core::JSON::String>(_T("configurl"), nullptr, &Controller::set_configUrl, this);
+         Register<CloneParamsInfo,Core::JSON::String>(_T("clone"), &Controller::endpoint_clone, this);
+     }
+ 
+@@ -57,6 +58,7 @@ namespace Plugin {
+         Unregister(_T("startdiscovery"));
+         Unregister(_T("deactivate"));
+         Unregister(_T("activate"));
++        Unregister(_T("configurl"));
+         Unregister(_T("configuration"));
+         Unregister(_T("environment"));
+         Unregister(_T("discoveryresults"));
+@@ -416,6 +418,43 @@ namespace Plugin {
+         return result;
+     }
+ 
++    // Property: configurl - Configuration the url of a service
++    // Return codes:
++    //  - ERROR_NONE: Success
++    //  - ERROR_UNKNOWN_KEY: The service does not exist
++    //  - ERROR_GENERAL: Failed to update the configuration
++    uint32_t Controller::set_configUrl(const string& index, const Core::JSON::String& params)
++    {
++        uint32_t result = Core::ERROR_UNKNOWN_KEY;
++        Core::ProxyType<PluginHost::Server::Service> service;
++
++        ASSERT(_pluginServer != nullptr);
++        std::cout << "set_configUrl index = " << index << "param = " << params.Value() << "\n";
++        if (_pluginServer->Services().FromIdentifier(index, service) == Core::ERROR_NONE) {
++            const string& configuration = params.Value();
++
++            JsonObject data = JsonObject(configuration.c_str());
++            if (data.HasLabel("url")) {
++              string old_config = service->ConfigLine();
++              JsonObject old_config_json = JsonObject(old_config.c_str());
++              if (old_config_json.HasLabel("url")) {
++                  old_config_json["url"] = data["url"];
++                  old_config_json.ToString(old_config);
++                  result = service->ConfigLine(old_config);
++              } else {
++                result = Core::ERROR_GENERAL;
++              }
++            } else if (data.HasLabel("launchtype")) {
++              string launchtype = data["launchtype"].String();
++              std::cout << "Ness_Debug change launch type " << launchtype << "\n";
++              service->ChangeLaunchType(launchtype);
++              result = Core::ERROR_NONE;
++            }
++        }
++
++        return result;
++    }
++
+     // Event: statechange - Signals a plugin state change
+     void Controller::event_statechange(const string& callsign, const PluginHost::IShell::state& state, const PluginHost::IShell::reason& reason)
+     {
+diff --git a/Source/WPEFramework/PluginServer.cpp b/Source/WPEFramework/PluginServer.cpp
+index 9c246f39..d4910a8a 100644
+--- a/Source/WPEFramework/PluginServer.cpp
++++ b/Source/WPEFramework/PluginServer.cpp
+@@ -275,7 +275,6 @@ ENUM_CONVERSION_BEGIN(Core::ProcessInfo::scheduler)
+     uint32_t Server::Service::Activate(const PluginHost::IShell::reason why)
+     {
+         uint32_t result = Core::ERROR_NONE;
+-
+         Lock();
+ 
+         IShell::state currentState(State());
+@@ -293,7 +292,6 @@ ENUM_CONVERSION_BEGIN(Core::ProcessInfo::scheduler)
+ 
+             const string callSign(PluginHost::Service::Configuration().Callsign.Value());
+             const string className(PluginHost::Service::Configuration().ClassName.Value());
+-
+             if (_handler == nullptr) {
+                 SYSLOG(Logging::Startup, (_T("Activation of plugin [%s]:[%s], failed. Error [%s]"), className.c_str(), callSign.c_str(), ErrorMessage().c_str()));
+                 result = Core::ERROR_UNAVAILABLE;
+@@ -470,6 +468,100 @@ ENUM_CONVERSION_BEGIN(Core::ProcessInfo::scheduler)
+         return (result);
+     }
+ 
++    string prefix_launch_type("launch=");
++    // Following definition is from Google YouTube test Spec
++    string yt_launch_type[] = {
++          "menu",
++          "guide",
++          "launcher",
++          "remote",
++          "promo",
++          "search",
++          "voice",
++          "dial",
++          "",
++        };
++
++    bool Server::Service::CheckInputLaunchType(string&config, string& type) {
++     string::size_type   pos(0);
++     if ((pos=config.find(type))==string::npos) {
++       return false;
++     }
++     return true;
++   }
++
++   bool Server::Service::CheckTypeIsValid(string& type) {
++     int i = 0;
++     if (type.empty()) return false;
++     while (0 != yt_launch_type[i].length()) {
++       if (yt_launch_type[i] == type)
++         return true;
++       i++;
++     }
++     return false;
++   }
++
++   bool Server::Service::ConfigNewLaunchType(string& config, string& type) {
++     int i = 0;
++     if ( ! CheckTypeIsValid(type) ) return false;
++     string new_type = prefix_launch_type + type;
++     // 1. check input launch time is in URL
++     if (CheckInputLaunchType(config, new_type)) {
++       return false;
++     }
++     string::size_type   pos(0);
++     // 2. check there is no launch type in URL
++     if (!CheckInputLaunchType(config, prefix_launch_type)) {
++       // URL has no launch type
++       pos = config.find(string("https://www.youtube.com"));
++       if (string::npos == pos) {
++         std::cout << "Cannot find youtube in config!! " << "\n";
++         return false;
++       }
++
++       string::size_type end_pos;
++       end_pos = config.find('"', pos);
++       if (string::npos == pos) {
++       std::cout << "Cannot find end of youtube url in config!! " << "\n";
++         return false;
++       }
++
++       string yt_url = config.substr(pos, end_pos - pos);
++       std::cout << " yt_url = " << yt_url << "\n";
++
++       pos = yt_url.find('?');
++       if (string::npos == pos) {
++         new_type = "?" + new_type;
++       } else {
++         new_type = "&" + new_type;
++       }
++       config.insert(end_pos, new_type);
++
++     } else {
++       // 3. Find the old launch type and replace it
++       while ( 0 != yt_launch_type[i].length()) {
++         string old_type = prefix_launch_type + yt_launch_type[i];
++         pos = config.find(old_type);
++         if (string::npos != pos) {
++           // find the launch type
++           config.replace(pos, old_type.length(), new_type);
++           break;
++         }
++         i++;
++       }
++      }
++     return true;
++    }
++
++    void Server::Service::ChangeLaunchType(string& launchtype)
++    {
++        syslog(LOG_INFO, "Change Youtube launch type %s\n", launchtype.c_str());
++        string config_line = ConfigLine();
++        if (ConfigNewLaunchType(config_line, launchtype)) {
++          ConfigLine(config_line);
++        }
++    }
++
+     /* virtual */ uint32_t Server::Service::Submit(const uint32_t id, const Core::ProxyType<Core::JSON::IElement>& response)
+     {
+         return (_administrator.Submit(id, response));
+diff --git a/Source/WPEFramework/PluginServer.h b/Source/WPEFramework/PluginServer.h
+index e96da46e..7ae7569d 100644
+--- a/Source/WPEFramework/PluginServer.h
++++ b/Source/WPEFramework/PluginServer.h
+@@ -850,8 +850,11 @@ namespace PluginHost {
+ 
+                 return (number.length() > 0) && (std::all_of(number.begin(), number.end(), [](TCHAR item) { return std::isdigit(item); })) && (Service::IsSupported(static_cast<uint8_t>(atoi(number.c_str()))));
+             }
+-
++            void ChangeLaunchType(string& launchtype);
+         private:
++            bool CheckInputLaunchType(string&config, string& type);
++            bool CheckTypeIsValid(string& type);
++            bool ConfigNewLaunchType(string& config, string& type);
+             inline IPlugin* CheckLibrary(const string& name, const TCHAR* className, const uint32_t version)
+             {
+                 IPlugin* newIF = nullptr;
+-- 
+2.31.0
+

@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Copyright (c) 2023 Amlogic, Inc. All rights reserved.
+# This source code is subject to the terms and conditions defined
+# in the file 'LICENSE' which is part of this source code package.
+# Description:  S10 spi led file
+#
+case "$1" in
+    start|"")
+        /usr/sbin/spi_led -D /dev/spidev1.0 -b 32 -s 3340000 -v -c 000000ff > /dev/null
+        ;;
+    stop) ;;
+    *)
+        echo "Usage: S10spiled {start|stop}" >&2
+        exit 1
+        ;;
+esac

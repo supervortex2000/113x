@@ -1,0 +1,5 @@
+config BR2_PACKAGE_ONVIF_WSDD
+  bool "onvif wsdd package"
+  select BR2_PACKAGE_IPC_PROPERTY
+  help
+     onvif wsdd server

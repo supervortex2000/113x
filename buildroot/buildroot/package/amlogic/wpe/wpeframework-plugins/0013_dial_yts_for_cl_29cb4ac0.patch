@@ -1,0 +1,45 @@
+diff --git a/DIALServer/DIALServer.cpp b/DIALServer/DIALServer.cpp
+index fb8d170..a1ddb2c 100644
+--- a/DIALServer/DIALServer.cpp
++++ b/DIALServer/DIALServer.cpp
+@@ -380,7 +380,8 @@ namespace Plugin {
+ 
+         // get an interface with a public IP address, then we will have a proper MAC address..
+         Core::NodeId selectedNode = Plugin::Config::IPV4UnicastNode(_config.Interface.Value());
+-        if (selectedNode.IsValid() == false) {
++        //if (selectedNode.IsValid() == false) {
++        {
+             if (get_interface_addr("eth0",(char *)hostip))
+             {
+                 bhasnetwork = true;
+@@ -726,7 +727,29 @@ namespace Plugin {
+                         result->Body(textBody);
+                         TRACE(Protocol, (static_cast<const string&>(*textBody)));
+                     } else if (request.Verb == Web::Request::HTTP_POST) {
+-                        StartApplication(request, result, selectedApp->second);
++                        std::regex youtuberx("https://(.*)youtube.com(.*)");
++                        std::regex youtuapprx("package:(.*)");
++                        std::regex youtuapprx2("(.*)package:(\\s*)com.google.(.*).youtube");
++                        bool bmatchyoutube =false;
++                        if (request.Origin.IsSet())
++                        {
++                            bmatchyoutube = std::regex_match(request.Origin.Value().begin(),request.Origin.Value().end(), youtuberx);
++                            bmatchyoutube |= std::regex_match(request.Origin.Value().begin(),request.Origin.Value().end(), youtuapprx);
++                            bmatchyoutube |= std::regex_match(request.Origin.Value().begin(),request.Origin.Value().end(), youtuapprx2);
++                            if (bmatchyoutube)
++                            {
++                                StartApplication(request, result, selectedApp->second);
++                            }
++                            else
++                            {
++                                result->ErrorCode = Web::STATUS_FORBIDDEN;
++                                result->Message = string(_T("Unknown request path specified."));
++                            }
++                        }else
++                        {
++                            result->ErrorCode = Web::STATUS_FORBIDDEN;
++                            result->Message = string(_T("Unknown request path specified."));
++                        }
+                     }
+                     else if (request.Verb == Web::Request::HTTP_DELETE) {
+                         StopApplication(request, result, selectedApp->second);

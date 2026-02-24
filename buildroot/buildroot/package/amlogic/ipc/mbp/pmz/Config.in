@@ -1,0 +1,5 @@
+config BR2_PACKAGE_PMZ
+	bool "mbp pmz"
+	depends on BR2_PACKAGE_LINUX_OSAL
+	help
+	  mbp pmz driver

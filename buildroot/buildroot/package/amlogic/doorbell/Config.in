@@ -1,0 +1,4 @@
+config BR2_PACKAGE_DOORBELL
+    bool "doorbell"
+    help
+    doorbell application

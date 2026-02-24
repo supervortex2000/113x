@@ -1,0 +1,13 @@
+diff --git a/mDNSPosix/Makefile b/mDNSPosix/Makefile
+index 4f98e90..c4c49d7 100755
+--- a/mDNSPosix/Makefile
++++ b/mDNSPosix/Makefile
+@@ -213,7 +213,7 @@ endif
+ endif
+ endif
+ 
+-CFLAGS = $(CFLAGS_COMMON) $(CFLAGS_OS) $(CFLAGS_DEBUG)
++CFLAGS = $(CFLAGS_COMMON) $(CFLAGS_OS) $(CFLAGS_DEBUG) $(CFLAGS_EXTRA)
+ 
+ #############################################################################
+ 

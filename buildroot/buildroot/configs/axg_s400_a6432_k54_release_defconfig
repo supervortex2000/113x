@@ -1,0 +1,17 @@
+#
+# Copyright (c) 2022 Amlogic, Inc. All rights reserved.
+# This source code is subject to the terms and conditions
+# defined in the file 'LICENSE' which is part of this source code package.
+# Description: axg s400 kernel5.4 config file
+#
+#----------------------------------------------------------#
+#include "arch_a6432_10.2_10.3.config"
+
+#----------------------------------------------------------#
+#include "a113_s400_k54.config"
+#include "flash_nand_2k.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/common/initramfs/initramfs-54/ramfslist-32-ubi-release"
+
+### If tdk 3.18 is already enabled, please enable the following command
+### BR2_PACKAGE_UBOOT_EXTRA_ARGS="--bl32 ./bl32/bl32_3.18/bin/axg/bl32.nand.img"
+

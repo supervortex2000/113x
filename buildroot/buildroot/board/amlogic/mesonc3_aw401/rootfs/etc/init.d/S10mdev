@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Run the mdev daemon
+#
+
+DAEMON="mdev"
+PIDFILE="/var/run/$DAEMON.pid"
+
+
+start() {
+	echo -n "Starting $DAEMON... "
+    mdev -s&
+}
+
+stop() {
+    echo -n "Stop $DAEMON... "
+}
+
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+  start|stop|restart)
+	"$1"
+	;;
+  *)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?

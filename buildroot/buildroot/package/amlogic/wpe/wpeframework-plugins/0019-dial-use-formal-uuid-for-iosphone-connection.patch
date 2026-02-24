@@ -1,0 +1,60 @@
+diff --git a/DIALServer/DIALServer.cpp b/DIALServer/DIALServer.cpp
+index a0c0f03..0ad5618 100644
+--- a/DIALServer/DIALServer.cpp
++++ b/DIALServer/DIALServer.cpp
+@@ -129,7 +129,7 @@ namespace Plugin {
+         return (index);
+     }
+ 
+-    DIALServer::DIALServerImpl::DIALServerImpl(const string& MACAddress, const string& baseURL, const string& appPath)
++    DIALServer::DIALServerImpl::DIALServerImpl(const string& MACAddress, const string& baseURL, const string& appPath,const string& uuidID)
+         : BaseClass(5, false, Core::NodeId(DialServerInterface.AnyInterface(), DialServerInterface.PortNumber()), DialServerInterface.AnyInterface(), 1024, 1024)
+         , _response(Core::ProxyType<Web::Response>::Create())
+         , _destinations()
+@@ -141,7 +141,7 @@ namespace Plugin {
+         _response->CacheControl = _T("max-age=1800");
+         _response->Server = _T("Linux/2.6 UPnP/1.0 quick_ssdp/1.0");
+         _response->ST = _SearchTarget;
+-        _response->USN = _T("uuid:UniqueIdentifier::") + _SearchTarget;
++        _response->USN = _T("uuid:") + uuidID + _T("::") + _SearchTarget;
+         // FIXME: Uncomment when adding WoL/WoWLAN support.
+         // This SHALL NOT be present if neither WoL nor WoWLAN is supported.
+         // Moreover real MAC address of the network iface (either wired or wireless one) should be passed
+@@ -474,17 +474,19 @@ namespace Plugin {
+             if (get_mac_address(ipaddr,c_macaddr))
+             {
+                 MacAddress= _T(c_macaddr);
+-                deviceId = deviceId+getDeviceId();
+-                deviceId.erase(std::remove(deviceId.begin(), deviceId.end(), '-'), deviceId.end());
+-                deviceId.erase(std::remove(deviceId.begin(), deviceId.end(), '/'), deviceId.end());
++                char mac_addr[18] = "02ad32013756";
++		        get_mac(mac_addr, "eth0");
++                string macid=string(mac_addr);
++                macid.erase(std::remove(macid.begin(), macid.end(),':'),macid.end());
++                deviceId=_T("6d616f6c-6967-7463-6435-")+macid;
+             }
+ 			if (urlwithoutport.compare(_dialURL.Text()))
+             {
+-                _dialServiceImpl = new DIALServerImpl(MacAddress, _dialURL.Text(), _DefaultAppInfoPath);
++                _dialServiceImpl = new DIALServerImpl(MacAddress, _dialURL.Text(), _DefaultAppInfoPath,deviceId);
+ 
+             }
+ 			else{
+-				_dialServiceImpl = new DIALServerImpl(MacAddress, urlwithport, _DefaultAppInfoPath);
++				_dialServiceImpl = new DIALServerImpl(MacAddress, urlwithport, _DefaultAppInfoPath,deviceId);
+             }
+ 
+             ASSERT(_dialServiceImpl != nullptr);
+diff --git a/DIALServer/DIALServer.h b/DIALServer/DIALServer.h
+index a882938..0a061f4 100644
+--- a/DIALServer/DIALServer.h
++++ b/DIALServer/DIALServer.h
+@@ -650,7 +650,7 @@ namespace Plugin {
+             DIALServerImpl& operator=(const DIALServerImpl&) = delete;
+ 
+         public:
+-            DIALServerImpl(const string& MACAddress, const string& baseURL, const string& appPath);
++            DIALServerImpl(const string& MACAddress, const string& baseURL, const string& appPath,const string& uuidID);
+             virtual ~DIALServerImpl();
+ 
+         public:

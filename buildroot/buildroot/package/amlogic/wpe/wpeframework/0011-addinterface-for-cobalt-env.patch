@@ -1,0 +1,12 @@
+diff --git a/Source/interfaces/IBrowser.h b/Source/interfaces/IBrowser.h
+index fff6b00..fb5835b 100644
+--- a/Source/interfaces/IBrowser.h
++++ b/Source/interfaces/IBrowser.h
+@@ -49,6 +49,7 @@ namespace Exchange {
+         virtual uint32_t GetFPS() const = 0;
+ 
+         virtual void Hide(const bool hidden) = 0;
++        virtual void SetENV(const string &env,const string &value) = 0;
+     };
+ 
+     /* @json */

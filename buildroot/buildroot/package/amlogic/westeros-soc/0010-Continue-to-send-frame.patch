@@ -1,0 +1,186 @@
+From d130c7edb6dac60fd0a4730318cea7353ec8cef0 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Thu, 4 Mar 2021 17:08:26 +0800
+Subject: [PATCH 10/12] Continue to send frame if video is paused but window
+ size is changed
+
+Change-Id: I6677f787d80e0ee50ebfa335631be8daf04b22cb
+---
+ drm/westeros-gl/westeros-gl.c | 147 ++++++++++++++++++++--------------
+ 1 file changed, 88 insertions(+), 59 deletions(-)
+
+diff --git a/drm/westeros-gl/westeros-gl.c b/drm/westeros-gl/westeros-gl.c
+index e661d22..63b05f9 100644
+--- a/drm/westeros-gl/westeros-gl.c
++++ b/drm/westeros-gl/westeros-gl.c
+@@ -4450,6 +4450,19 @@ static bool wstCheckPlanes( WstGLCtx *ctx, long long vblankTime, long long vblan
+                   dirty= true;
+                   iter->vfm->displayedFrameTime= frame->frameTime;
+                   sendStatus= true;
++               } else {
++                 if (frame->rectX != iter->videoFrame[FRAME_CURR].rectX
++                     || frame->rectY != iter->videoFrame[FRAME_CURR].rectY
++                     || frame->rectW != iter->videoFrame[FRAME_CURR].rectW
++                     || frame->rectH != iter->videoFrame[FRAME_CURR].rectH) {
++
++                  iter->dirty= true;
++                  iter->readyToFlip= true;
++                  iter->videoFrame[FRAME_CURR].rectX = frame->rectX;
++                  iter->videoFrame[FRAME_CURR].rectY = frame->rectY;
++                  iter->videoFrame[FRAME_CURR].rectW = frame->rectW;
++                  iter->videoFrame[FRAME_CURR].rectH = frame->rectH;
++                 }
+                }
+             }
+             if ( iter->vfm->underflowDetected )
+@@ -5030,62 +5043,80 @@ static void wstSwapDRMBuffersAtomic( WstGLCtx *ctx )
+       {
+          if ( iter->dirty && iter->readyToFlip )
+          {
+-            if ( iter->videoFrame[FRAME_NEXT].fbId )
+-            {
+-               uint32_t fbId= iter->videoFrame[FRAME_NEXT].fbId;
+-               uint32_t handle0= iter->videoFrame[FRAME_NEXT].handle0;
+-               uint32_t handle1= iter->videoFrame[FRAME_NEXT].handle1;
+-               int fd0= iter->videoFrame[FRAME_NEXT].fd0;
+-               int fd1= iter->videoFrame[FRAME_NEXT].fd1;
+-               int fd2= iter->videoFrame[FRAME_NEXT].fd2;
+-               uint32_t frameWidth= iter->videoFrame[FRAME_NEXT].frameWidthVisible;
+-               uint32_t frameHeight= iter->videoFrame[FRAME_NEXT].frameHeightVisible;
+-               int rectX= iter->videoFrame[FRAME_NEXT].rectX;
+-               int rectY= iter->videoFrame[FRAME_NEXT].rectY;
+-               int rectW= iter->videoFrame[FRAME_NEXT].rectW;
+-               int rectH= iter->videoFrame[FRAME_NEXT].rectH;
+-               int bufferId= iter->videoFrame[FRAME_NEXT].bufferId;
+-               uint32_t sx, sy, sw, sh, dx, dy, dw, dh;
+-               int modeWidth, modeHeight, gfxWidth, gfxHeight;
+-
+-               iter->videoFrame[FRAME_FREE]= iter->videoFrame[FRAME_PREV];
+-               iter->videoFrame[FRAME_PREV]= iter->videoFrame[FRAME_CURR];
+-               iter->videoFrame[FRAME_CURR]= iter->videoFrame[FRAME_NEXT];
+-
+-               iter->videoFrame[FRAME_NEXT].fbId= 0;
+-               iter->videoFrame[FRAME_NEXT].handle0= 0;
+-               iter->videoFrame[FRAME_NEXT].handle1= 0;
+-               iter->videoFrame[FRAME_NEXT].fd0= -1;
+-               iter->videoFrame[FRAME_NEXT].fd1= -1;
+-               iter->videoFrame[FRAME_NEXT].fd2= -1;
+-               iter->videoFrame[FRAME_NEXT].hide= false;
+-               iter->videoFrame[FRAME_NEXT].hidden= false;
+-               iter->videoFrame[FRAME_NEXT].vf= 0;
+-
+-               iter->plane->crtc_id= ctx->overlayPlanes.primary->crtc_id;
+-
+-               sw= frameWidth;
+-               sh= frameHeight;
+-               dw= rectW;
+-               dh= rectH;
+-               sx= 0;
+-               dx= rectX;
+-               if ( rectX < 0 )
+-               {
+-                  sx= -rectX*frameWidth/rectW;
+-                  sw -= sx;
+-                  dx= 0;
+-                  dw += rectX;
+-               }
+-               sy= 0;
+-               dy= rectY;
+-               if ( rectY < 0 )
+-               {
+-                  sy= -rectY*frameHeight/rectH;
+-                  sh -= sy;
+-                  dy= 0;
+-                  dh += rectY;
+-               }
++           uint32_t fbId, handle0, handle1;
++           int fd0, fd1, fd2;
++           uint32_t frameWidth, frameHeight;
++           int rectX, rectY, rectW, rectH, bufferId;
++           uint32_t sx, sy, sw, sh, dx, dy, dw, dh;
++           int modeWidth, modeHeight, gfxWidth, gfxHeight;
++           if ( iter->videoFrame[FRAME_NEXT].fbId ) {
++             fbId= iter->videoFrame[FRAME_NEXT].fbId;
++             handle0= iter->videoFrame[FRAME_NEXT].handle0;
++             handle1= iter->videoFrame[FRAME_NEXT].handle1;
++             fd0= iter->videoFrame[FRAME_NEXT].fd0;
++             fd1= iter->videoFrame[FRAME_NEXT].fd1;
++             fd2= iter->videoFrame[FRAME_NEXT].fd2;
++             frameWidth= iter->videoFrame[FRAME_NEXT].frameWidthVisible;
++             frameHeight= iter->videoFrame[FRAME_NEXT].frameHeightVisible;
++             rectX= iter->videoFrame[FRAME_NEXT].rectX;
++             rectY= iter->videoFrame[FRAME_NEXT].rectY;
++             rectW= iter->videoFrame[FRAME_NEXT].rectW;
++             rectH= iter->videoFrame[FRAME_NEXT].rectH;
++             bufferId= iter->videoFrame[FRAME_NEXT].bufferId;
++
++             iter->videoFrame[FRAME_FREE]= iter->videoFrame[FRAME_PREV];
++             iter->videoFrame[FRAME_PREV]= iter->videoFrame[FRAME_CURR];
++             iter->videoFrame[FRAME_CURR]= iter->videoFrame[FRAME_NEXT];
++
++             iter->videoFrame[FRAME_NEXT].fbId= 0;
++             iter->videoFrame[FRAME_NEXT].handle0= 0;
++             iter->videoFrame[FRAME_NEXT].handle1= 0;
++             iter->videoFrame[FRAME_NEXT].fd0= -1;
++             iter->videoFrame[FRAME_NEXT].fd1= -1;
++             iter->videoFrame[FRAME_NEXT].fd2= -1;
++             iter->videoFrame[FRAME_NEXT].hide= false;
++             iter->videoFrame[FRAME_NEXT].hidden= false;
++             iter->videoFrame[FRAME_NEXT].vf= 0;
++           } else {
++             fbId= iter->videoFrame[FRAME_CURR].fbId;
++             handle0= iter->videoFrame[FRAME_CURR].handle0;
++             handle1= iter->videoFrame[FRAME_CURR].handle1;
++             fd0= iter->videoFrame[FRAME_CURR].fd0;
++             fd1= iter->videoFrame[FRAME_CURR].fd1;
++             fd2= iter->videoFrame[FRAME_CURR].fd2;
++             frameWidth= iter->videoFrame[FRAME_CURR].frameWidthVisible;
++             frameHeight= iter->videoFrame[FRAME_CURR].frameHeightVisible;
++             rectX= iter->videoFrame[FRAME_CURR].rectX;
++             rectY= iter->videoFrame[FRAME_CURR].rectY;
++             rectW= iter->videoFrame[FRAME_CURR].rectW;
++             rectH= iter->videoFrame[FRAME_CURR].rectH;
++             bufferId= iter->videoFrame[FRAME_CURR].bufferId;
++           }
++
++           iter->plane->crtc_id= ctx->overlayPlanes.primary->crtc_id;
++
++           sw= frameWidth;
++           sh= frameHeight;
++           dw= rectW;
++           dh= rectH;
++           sx= 0;
++           dx= rectX;
++           if ( rectX < 0 )
++           {
++             sx= -rectX*frameWidth/rectW;
++             sw -= sx;
++             dx= 0;
++             dw += rectX;
++           }
++           sy= 0;
++           dy= rectY;
++           if ( rectY < 0 )
++           {
++             sy= -rectY*frameHeight/rectH;
++             sh -= sy;
++             dy= 0;
++             dh += rectY;
++           }
+ 
+                TRACE3("%dx%d %d,%d,%d,%d : s(%d,%d,%d,%d) d(%d,%d,%d,%d)",
+                        frameWidth, frameHeight,
+@@ -5195,9 +5226,7 @@ static void wstSwapDRMBuffersAtomic( WstGLCtx *ctx )
+                   avProgLog( iter->videoFrame[FRAME_CURR].frameTime*1000LL, 0, "WtoD", "");
+                }
+             }
+-         }
+-
+-         iter= iter->next;
++          iter= iter->next;
+       }
+    }
+    pthread_mutex_unlock( &ctx->mutex );
+-- 
+2.31.0
+

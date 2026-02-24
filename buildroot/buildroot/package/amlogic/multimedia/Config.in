@@ -1,0 +1,40 @@
+menu "Audio and video applications"
+source "package/amlogic/multimedia/alsa-plugins/Config.in"
+source "package/amlogic/multimedia/X-amaudio/Config.in"
+source "package/amlogic/multimedia/X-audiocapture/Config.in"
+source "package/amlogic/multimedia/X-mediasupport/Config.in"
+source "package/amlogic/multimedia/dolby-atmos-release/Config.in"
+source "package/amlogic/multimedia/dolby-ms12-release/Config.in"
+source "package/amlogic/multimedia/dts-release/Config.in"
+source "package/amlogic/multimedia/v4l2-uvm-test/Config.in"
+source "package/amlogic/multimedia/avsync-lib/Config.in"
+
+# Gstreamer 0.10.x & Plugins
+source "package/amlogic/multimedia/X-gst-fluendo-mpegdemux/Config.in"
+source "package/amlogic/multimedia/X-gst-aml-plugins/Config.in"
+source "package/amlogic/multimedia/gst-aml-plugins1/Config.in"
+source "package/amlogic/multimedia/gst-aml-drm-plugins1/Config.in"
+source "package/amlogic/multimedia/gst-aml-drmbufferpool1/Config.in"
+source "package/amlogic/multimedia/X-gst-app/Config.in"
+
+source "package/amlogic/multimedia/libplayer/Config.in"
+source "package/amlogic/multimedia/X-wifidisplay/Config.in"
+source "package/amlogic/multimedia/mediahal-sdk/Config.in"
+#source "package/amlogic/multimedia/test_tool/spdif_in_dd_decoder/Config.in"
+
+# secure video firmware load
+source "package/amlogic/multimedia/secfirmload/Config.in"
+
+# hal audio
+source "package/amlogic/multimedia/aml-halaudio/Config.in"
+source "package/amlogic/multimedia/audio_effects/Config.in"
+
+# drm prebuild
+source "package/amlogic/multimedia/widevine-bin/Config.in"
+source "package/amlogic/multimedia/playready-bin/Config.in"
+source "package/amlogic/multimedia/libsecmem-bin/Config.in"
+source "package/amlogic/multimedia/youtubesign-bin/Config.in"
+source "package/amlogic/multimedia/libwfd_hdcp-bin/Config.in"
+source "package/amlogic/multimedia/cleartvp-bin/Config.in"
+source "package/amlogic/multimedia/netflix-ta-bin/Config.in"
+endmenu

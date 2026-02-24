@@ -1,0 +1,103 @@
+From cbfc777c78cbb36f054da6490580cc48bc94ffb3 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Thu, 3 Dec 2020 16:42:22 +0800
+Subject: [PATCH] sync company and product name
+
+---
+ MediaSystem.cpp | 70 +++++++++++++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 66 insertions(+), 4 deletions(-)
+
+diff --git a/MediaSystem.cpp b/MediaSystem.cpp
+index 1737c9b..d21a17b 100644
+--- a/MediaSystem.cpp
++++ b/MediaSystem.cpp
+@@ -27,6 +27,60 @@
+ 
+ namespace CDMi {
+ 
++#define MAX_COMPANY_NAME_LENGTH 100
++char cdmi_company_name[MAX_COMPANY_NAME_LENGTH];
++char cdmi_product_name[MAX_COMPANY_NAME_LENGTH];
++
++bool TryGetString(const char* prefix, size_t prefix_len,
++    char* in_value, size_t in_length,
++    char* out_value, size_t value_length) {
++  bool result = false;
++  if (in_length <= prefix_len) return false;
++  if (strncmp(prefix, in_value, prefix_len) == 0) {
++
++    char* remainder = in_value + prefix_len;
++    size_t remainder_length = strlen(remainder);
++    if (remainder_length > 1 && remainder_length < value_length) {
++      // trim the newline character
++      for(int i = remainder_length - 1; i >= 0 && !std::isalnum(remainder[i]); --i)
++        remainder[i] = '\0';
++      strncpy(out_value, remainder, remainder_length);
++      result = true;
++    }
++  }
++  return result;
++}
++
++bool TryReadFromPropertiesFile(void) {
++  cdmi_company_name[0] = '\0';
++  cdmi_product_name[0] = '\0';
++
++  FILE* properties = fopen("/etc/device.properties", "r");
++  if (!properties) {
++    return false;
++  }
++
++  bool result = false;
++  char* buffer = nullptr;
++  size_t size = 0;
++  while (getline(&buffer, &size, properties) != -1) {
++    if (cdmi_company_name[0] == '\0' &&
++        TryGetString("BRAND_NAME=", 11, buffer, size, cdmi_company_name, MAX_COMPANY_NAME_LENGTH))
++      continue;
++    if (cdmi_product_name[0] == '\0' &&
++        TryGetString("MODEL_NAME=", 11, buffer, size, cdmi_product_name, MAX_COMPANY_NAME_LENGTH))
++      continue;
++    if (cdmi_company_name[0] != '\0' &&
++        cdmi_product_name[0] != '\0')
++      break;
++  }
++
++  free(buffer);
++  fclose(properties);
++
++  return result;
++}
++
+ class WideVine : public IMediaKeys, public widevine::Cdm::IEventListener
+ {
+ private:
+@@ -78,13 +132,21 @@ public:
+         , _sessions() {
+ 
+         widevine::Cdm::ClientInfo client_info;
+-
++        TryReadFromPropertiesFile();
+         // Set client info that denotes this as the test suite:
+-        client_info.product_name = "WPEFramework";
+-        client_info.company_name = "www.metrological.com";
++        if (cdmi_product_name[0] != '\0')
++          client_info.product_name = cdmi_product_name;
++        else
++          client_info.product_name = "WPEFramework";
++        if (cdmi_company_name[0] != '\0')
++          client_info.company_name = cdmi_company_name;  
++        else
++          client_info.company_name = "www.metrological.com";
++        if (cdmi_product_name[0] != '\0')
++          client_info.model_name = cdmi_product_name;
++        else
+         client_info.model_name = "www";
+ 
+-
+ #if defined(__linux__)
+         client_info.device_name = "Linux";
+         {
+-- 
+2.7.4
+

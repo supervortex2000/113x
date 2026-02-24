@@ -1,0 +1,24 @@
+From 466bfa9a33a35cad08dffda5593996bec10981e1 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Thu, 4 Feb 2021 14:41:46 +0800
+Subject: [PATCH] Resolve Memory Leak
+
+---
+ OpenCDMi/FrameworkRPC.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/OpenCDMi/FrameworkRPC.cpp b/OpenCDMi/FrameworkRPC.cpp
+index c13a42f..1734942 100644
+--- a/OpenCDMi/FrameworkRPC.cpp
++++ b/OpenCDMi/FrameworkRPC.cpp
+@@ -302,6 +302,7 @@ namespace Plugin {
+ 
+                                     // Adjust the buffer on our sied (this process) on what we will write back
+                                     SetBuffer(0, clearContentSize, clearContent);
++                                    free(clearContent);
+                                 }
+ 
+                                 // Store the status we have for the other side.
+-- 
+2.7.4
+

@@ -1,0 +1,26 @@
+From a40a35a516aeb7aa829e56eafe5c2daa9a022240 Mon Sep 17 00:00:00 2001
+From: Pradeep Sriram <pradeep.sriram@amlogic.com>
+Date: Wed, 12 Feb 2020 17:08:32 -0800
+Subject: [PATCH] set env for aamp
+
+---
+ Streamer/StreamerImplementation.cpp | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/Streamer/StreamerImplementation.cpp b/Streamer/StreamerImplementation.cpp
+index 7044978..e1b06d7 100644
+--- a/Streamer/StreamerImplementation.cpp
++++ b/Streamer/StreamerImplementation.cpp
+@@ -37,6 +37,9 @@ namespace Plugin {
+         _externalAccess = new ExternalAccess(Core::NodeId(config.Connector.Value().c_str()), this, service->ProxyStubPath(), _engine);
+ 
+         result = Core::ERROR_OPENING_FAILED;
++
++        Core::SystemInfo::SetEnvironment(_T("WAYLAND_DISPLAY"), _T("wayland-0"));
++        Core::SystemInfo::SetEnvironment(_T("XDG_RUNTIME_DIR"), _T("/run"));
+         if (_externalAccess != nullptr) {
+             if (_externalAccess->IsListening() == false) {
+                 delete _externalAccess;
+-- 
+2.24.1
+

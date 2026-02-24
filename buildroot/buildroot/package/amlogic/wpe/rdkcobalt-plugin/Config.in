@@ -1,0 +1,29 @@
+config BR2_PACKAGE_RDKCOBALT_PLUGIN
+	bool "WPEFrameWork cobalt plugin"
+	select RDKCOBALT_MAJOR_VERSION
+	#select curl
+	help
+	   WPEFrameWork Cobalt plugin.
+
+
+config BR2_PACKAGE_RDKCOBALT_HTMLAPP
+	bool "htmlapp base on Cobalt"
+	select BR2_PACKAGE_RDKCOBALT_PLUGIN
+	help
+		HTML app base on Cobalt
+
+if BR2_PACKAGE_RDKCOBALT_HTMLAPP
+
+config BR2_PACKAGE_RDKCOBALT_HTMLAPP_WEBFILEPATH
+	string "web_file_path"
+    default "/var/www"
+	help
+	  Local web file path
+
+config BR2_PACKAGE_RDKCOBALT_HTMLAPP_URL
+	string "URL"
+    default "file:///launcher/launcher.html"
+	help
+	  Local web file path
+endif
+

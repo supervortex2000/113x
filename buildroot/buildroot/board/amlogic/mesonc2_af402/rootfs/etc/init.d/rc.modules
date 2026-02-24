@@ -1,0 +1,55 @@
+#!/bin/sh
+# Load modules specified in the configuration file.
+# ---------------------------------------------------
+
+KERNEL_DRIVER=/lib/modules/$(uname -r)/kernel
+
+insmod /lib/modules/4.19.81+/kernel/drivers/media/v4l2-core/v4l2-dv-timings.ko &
+
+insmod ${KERNEL_DRIVER}/drivers/media/v4l2-core/videodev.ko
+insmod ${KERNEL_DRIVER}/drivers/media/common/videobuf2/videobuf2-common.ko
+
+insmod ${KERNEL_DRIVER}/drivers/media/v4l2-core/v4l2-common.ko
+insmod ${KERNEL_DRIVER}/drivers/media/common/videobuf2/videobuf2-v4l2.ko
+insmod ${KERNEL_DRIVER}/drivers/media/common/videobuf2/videobuf2-memops.ko
+insmod ${KERNEL_DRIVER}/drivers/media/common/videobuf2/videobuf2-vmalloc.ko
+
+insmod ${KERNEL_DRIVER}/media/media_clock.ko
+insmod ${KERNEL_DRIVER}/media/firmware.ko &
+insmod ${KERNEL_DRIVER}/media/amvenc_multi.ko &
+insmod ${KERNEL_DRIVER}/amlogic/arm_isp/iv009_isp_iq.ko &
+
+insmod ${KERNEL_DRIVER}/amlogic/arm_isp/iv009_isp_lens.ko&
+insmod ${KERNEL_DRIVER}/amlogic/arm_isp/iv009_isp_sensor.ko &
+insmod ${KERNEL_DRIVER}/amlogic/arm_isp/iv009_isp.ko &
+insmod ${KERNEL_DRIVER}/amlogic/ircut/ircut.ko &
+
+# wifi related
+insmod ${KERNEL_DRIVER}/net/wireless/cfg80211.ko &
+
+#usb adb
+insmod ${KERNEL_DRIVER}/drivers/usb/phy/phy-generic.ko
+insmod ${KERNEL_DRIVER}/drivers/usb/gadget/libcomposite.ko
+insmod ${KERNEL_DRIVER}/drivers/usb/gadget/udc/udc-core.ko
+
+while [ ! -e "/dev/ac_sbuf0" ]
+do
+    usleep 1
+done
+
+exit 0
+
+
+CONF=/etc/modules
+# Do nothing if the modules file is missing.
+if [ ! -f $CONF ]; then
+    exit 0
+fi
+# Make sure module dependencies are up to date.
+depmod
+# Read the configuration file and load the modules.
+cat $CONF | grep -v "^#" | while read file
+do
+    # Do this quietly (-q doesn't ignore errors)
+    modprobe $file 2> /dev/null
+done

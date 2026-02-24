@@ -1,0 +1,77 @@
+From 3197be24beb7b509cb46d9f3dd9d156ebbccb991 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Tue, 29 Dec 2020 16:44:43 +0800
+Subject: [PATCH] OpenCDMi Add GetMetrics
+
+Add service certificate for widevine privacy mode
+---
+ OpenCDMi/FrameworkRPC.cpp | 53 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+
+diff --git a/OpenCDMi/FrameworkRPC.cpp b/OpenCDMi/FrameworkRPC.cpp
+index aae79d6..c13a42f 100644
+--- a/OpenCDMi/FrameworkRPC.cpp
++++ b/OpenCDMi/FrameworkRPC.cpp
+@@ -790,6 +790,59 @@ namespace Plugin {
+                 return result;
+             }
+ 
++            // Get Server Certificate Request
++            virtual ::OCDM::OCDM_RESULT GetServerCertificateRequest(
++                const std::string& keySystem,
++                std::string& message) override
++            {
++
++                CDMi::IMediaKeys* system = _parent.KeySystem(keySystem);
++                ::OCDM::OCDM_RESULT result = ::OCDM::OCDM_RESULT::OCDM_S_FALSE;
++
++                if (system != nullptr) {
++                    TRACE(Trace::Information, ("Set ServerCertificate()"));
++                    result = static_cast<::OCDM::OCDM_RESULT>(system->GetServerCertificateRequest(message));
++                } else {
++                    TRACE_L1("Could not set the Server Certificates for system: %s", keySystem.c_str());
++                }
++                return result;
++            }
++
++            // Parse Server Certificate Response
++            virtual ::OCDM::OCDM_RESULT ParseServerCertificateResponse(
++                const std::string& keySystem,
++                const std::string& response,
++                std::string& certificate) override
++            {
++
++                CDMi::IMediaKeys* system = _parent.KeySystem(keySystem);
++                ::OCDM::OCDM_RESULT result = ::OCDM::OCDM_RESULT::OCDM_S_FALSE;
++
++                if (system != nullptr) {
++                    TRACE(Trace::Information, ("ParseServerCertificateResponse()"));
++                    result = static_cast<::OCDM::OCDM_RESULT>(system->ParseServerCertificateResponse(response, certificate));
++                } else {
++                    TRACE_L1("Could not parse Server Certificates response for system: %s", keySystem.c_str());
++                }
++                return result;
++            }
++
++            // Get Metrics
++            virtual ::OCDM::OCDM_RESULT GetMetrics(
++                const std::string& keySystem,
++                std::string& metrics) const override
++            {
++                CDMi::IMediaKeys* system = _parent.KeySystem(keySystem);
++                ::OCDM::OCDM_RESULT result = ::OCDM::OCDM_RESULT::OCDM_S_FALSE;
++                if (system != nullptr) {
++                    TRACE(Trace::Information, ("GetMetrics"));
++                    result = static_cast<::OCDM::OCDM_RESULT>(system->GetMetrics(metrics));
++                } else {
++                    TRACE_L1("Could not get metrics: %s", keySystem.c_str());
++                }
++                return result;
++            }
++
+             virtual uint64_t GetDrmSystemTime(const std::string& keySystem) const override
+             {
+                 CDMi::IMediaKeysExt* systemExt = dynamic_cast<CDMi::IMediaKeysExt*>(_parent.KeySystem(keySystem));
+-- 
+2.7.4
+

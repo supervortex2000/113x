@@ -1,0 +1,8 @@
+config BR2_PACKAGE_MBD_CAMERA
+	bool "mbd camera"
+	depends on BR2_PACKAGE_LINUX_OSAL
+	depends on BR2_PACKAGE_PMZ
+	depends on BR2_PACKAGE_MBD_BASE
+	depends on BR2_PACKAGE_MBD_DEWARP
+	help
+		ipc mbd camera driver

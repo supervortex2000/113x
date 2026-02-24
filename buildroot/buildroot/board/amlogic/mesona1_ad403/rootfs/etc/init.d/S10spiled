@@ -1,0 +1,12 @@
+#!/bin/sh
+
+case "$1" in
+    start|"")
+        /usr/sbin/spi_led -D /dev/spidev1.0 -b 32 -s 3340000 -v -c 000000ff
+        ;;
+    stop) ;;
+    *)
+        echo "Usage: S10spiled {start|stop}" >&2
+        exit 1
+        ;;
+esac

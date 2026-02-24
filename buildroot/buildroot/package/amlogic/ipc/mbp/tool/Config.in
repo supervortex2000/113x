@@ -1,0 +1,5 @@
+config BR2_PACKAGE_TOOL
+	bool "tool"
+    depends on BR2_PACKAGE_MBI
+	help
+	  C3 tools

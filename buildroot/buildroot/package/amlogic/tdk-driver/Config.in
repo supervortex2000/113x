@@ -1,0 +1,6 @@
+config BR2_PACKAGE_TDK_DRIVER
+	bool "tdk driver"
+	depends on BR2_PACKAGE_TDK
+	help
+	  tdk driver
+

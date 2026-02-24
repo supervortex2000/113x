@@ -1,0 +1,8 @@
+config BR2_PACKAGE_IPC_WIFI_QR_CONNECT
+	bool "ipc wifi qr connect"
+	select BR2_PACKAGE_QUIRC
+	select BR2_PACKAGE_LIBJPEG
+	select BR2_PACKAGE_LIBPNG
+	help
+	  config and connect wifi with qr code
+

@@ -1,0 +1,8 @@
+config BR2_PACKAGE_AML_NN_AIAUDIO_DEMO
+    bool "aml nn_aiaudio demo library"
+    depends on BR2_PACKAGE_NPU
+    depends on BR2_PACKAGE_AML_NN_AIAUDIO
+    select BR2_PACKAGE_AML_NN_AIAUDIO_MODEL
+    help
+        Support nn_audio base library
+

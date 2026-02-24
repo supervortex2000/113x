@@ -1,0 +1,9 @@
+#----------------------------------------------------------#
+#include "arch_a32_armv8_7.3.1.config"
+
+#----------------------------------------------------------#
+#include "a1_ad403.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesona1_ad403/initramfs/initramfs-419/ramfslist-32-ubi-release"
+BR2_TARGET_CPIO_INIT_PATH="board/amlogic/mesona1_ad403"
+BR2_TARGET_RECOVERY_BLACK_LIST="board/amlogic/mesona1_ad403/recovery_black_list.txt"
+BR2_TARGET_RECOVERY_INITRAMFS_LIST="board/amlogic/mesona1_ad403/initramfs/initramfs-419/ramfslist-recovery"

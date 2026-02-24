@@ -1,0 +1,80 @@
+#! /bin/sh
+export CAST_MODEL_PRIVKEY_SW=/etc/cast_lite/certs/model.key.bin
+export CAST_MODEL_CHAIN_SW=/etc/cast_lite/certs/model.crt
+export CAST_CMDLINE=/proc/cmdline
+
+Alsa_output_devic=""
+Alsa_volume_element_name=""
+Amlogic_dt_id="/proc/device-tree/amlogic-dt-id"
+
+if cat $Amlogic_dt_id | grep "a5_a113x2_av400_1g"; then
+	Alsa_output_devic="dmixer_avs_auto"
+	Alsa_volume_element_name="ad82128_d_30 Ch1"
+elif cat $Amlogic_dt_id | grep "a1-a113l_ad403_spk"; then
+	Alsa_output_devic="dmixer_avs_auto"
+	Alsa_volume_element_name="DAC Digital"
+elif cat $Amlogic_dt_id | grep "axg_s420_v03"; then
+	Alsa_output_devic="dmixer_auto"
+	Alsa_volume_element_name="Master"
+elif cat $Amlogic_dt_id | grep "a4_a113l2_ba400_sbr"; then
+	Alsa_output_devic="dmixer_avs_auto"
+	Alsa_volume_element_name="ad82128_d_30 Master"
+elif cat $Amlogic_dt_id | grep "a4_a113l2_ba400"; then
+	Alsa_output_devic="dmixer_avs_auto"
+	Alsa_volume_element_name="5707_A Master"
+else
+	echo"Cast Lite Error:No sound card and amixer information added for this board,will use default values."
+	Alsa_output_devic="dmixer_avs_auto"
+	Alsa_volume_element_name="ad82128_d_30 Ch1"
+fi
+
+start_cast_lite() {
+
+    SerialNumber=`cat "$CAST_CMDLINE" | grep "androidboot.serialno" | awk -F'androidboot.serialno=' '{print $2}' | awk -F' ' '{print $1}'`
+
+	echo "$SerialNumber" | grep -Eq '^[a-zA-Z0-9/\-_]{6,30}$'
+	if [ $? -ne 0 ]; then
+		echo "Waring:The serial number used does not comply with the rules, the default serial number will be enabled"
+		SerialNumber=""
+	fi
+    while true ; do
+        ping 8.8.8.8 -w 5
+        if [ $? -eq 1 ]; then
+            echo "cast_lite: please connect network first!"
+        else
+            client_auth_indiv --action=ensure
+            cast_sample_app --oem_cast_config=/etc/cast_lite/conf/cast_lite_aml.conf \
+			--alsa-output-device="$Alsa_output_devic" \
+			--alsa-output-buffer-size=4096 \
+			--alsa-volume-element-name="$Alsa_volume_element_name" \
+			--sys_info_serial_number="$SerialNumber" \
+			--sys_info_system_release_channel=dev-channel \
+			--sys_info_build_type=eng \
+			--enable-multizone=true \
+			--enable-multichannel \
+			--audio-output-sample-rate=48000 \
+			--accept-resource-control=false \
+			--env=staging&
+            break;
+        fi
+        sleep 10
+    done&
+}
+
+case "$1" in
+    start)
+        start_cast_lite
+    ;;
+    stop)
+        /usr/bin/killall -9 cast_sample_app
+    ;;
+    netready|netup|netdown|netchange) ;;
+    restart)
+    $0 stop
+    $0 start
+    ;;
+    *)
+    echo "Usage: $0 {start|stop|restart}"
+    exit 1
+    ;;
+esac

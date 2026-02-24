@@ -1,0 +1,7 @@
+config BR2_PACKAGE_IPC_WEBSTREAM_SERVER
+	bool "ipc webstream server"
+	select BR2_PACKAGE_IPC_SDK
+	select BR2_PACKAGE_LIBWEBSOCKETS
+	help
+	  ipc webstream server library
+

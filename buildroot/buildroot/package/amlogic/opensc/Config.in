@@ -1,0 +1,9 @@
+config BR2_PACKAGE_OPENSC
+	bool "OPENSC"
+	select BR2_PACKAGE_OPENSSL
+	help
+		OPENSC.
+
+config BR2_PACKAGE_OPENSC_SITE
+    string "OpenSC path"
+    default "$(TOPDIR)/../multimedia/OpenSC"

@@ -1,0 +1,27 @@
+config BR2_PACKAGE_RDKCOBALT
+	bool "libcobalt"
+	select BR2_PACKAGE_BROWSER_TOOLCHAIN_DEPOT_TOOLS
+	select BR2_PACKAGE_BROWSER_TOOLCHAIN_GCC_LINARO_AARCH64 if BR2_aarch64
+	select BR2_PACKAGE_BROWSER_TOOLCHAIN_GCC_LINARO_ARMEABIHF if BR2_arm
+	#select curl
+	help
+	   rdk libcobalt.
+
+config BR2_PACKAGE_RDKCOBALT_VERSION
+	string "Cobalt version"
+	default ""
+	help
+	  cobalt version
+
+config BR2_PACKAGE_RDKCOBALT_VIDEO_RESOLUTION
+	string "Cobalt Video Resolution"
+	default "1080p"
+	help
+	  Cobalt Video Resolution, now current it just support 720p, 1080p, 2160p
+
+config BR2_PACKAGE_RDKCOBALT_NPLB
+	bool "nplb"
+	default n
+	help
+	  Enable to build nplb
+

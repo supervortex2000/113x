@@ -1,0 +1,114 @@
+From 887d5542e636caafed5f059fe46466b88d30e3aa Mon Sep 17 00:00:00 2001
+From: "jinrong.liao" <jinrong.liao@amlogic.com>
+Date: Wed, 22 Dec 2021 17:51:49 +0800
+Subject: [PATCH] ad403: disable uac audio after bt pairing [1/1]
+
+PD#SWPL-68158
+
+Problem:
+Noise occurs after bluetooth pairing
+
+Solution:
+can't open sound card if uac audio is enabled
+
+Verify:
+ad403
+
+Change-Id: I181bddb8932eb3c5ede17e6639eae60d9a30fd07
+Signed-off-by: jinrong.liao <jinrong.liao@amlogic.com>
+---
+ utils/aplay.c       | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ utils/sco_handler.c |  1 +
+ 2 files changed, 45 insertions(+)
+
+diff --git a/utils/aplay.c b/utils/aplay.c
+index 5080d0a..4c06a62 100644
+--- a/utils/aplay.c
++++ b/utils/aplay.c
+@@ -32,6 +32,44 @@
+ /* Casting wrapper for the brevity's sake. */
+ #define CANCEL_ROUTINE(f) ((void (*)(void *))(f))
+ 
++// Write a number to file path.
++bool write_value(const char* path, int enable) {
++  int fd = open(path, O_WRONLY);
++  if (fd < 0) {
++    printf("Open %s fail: %s.\n", path, strerror(errno));
++    return false;
++  }
++  char cmd[4];
++  int ret = snprintf(cmd, sizeof(cmd), "%d", enable);
++  if (ret <= 0)
++    printf("Convert num %d to string fail: %s.\n", enable, strerror(errno));
++  if (write(fd, cmd, strlen(cmd)) != strlen(cmd)) {
++    printf("Write %s to %d fail: %s.\n", cmd, fd, strerror(errno));
++  }
++  close(fd);
++  return true;
++}
++
++bool uac_audio_enable(int enable) {
++
++	int KpathLen = 60;
++	const char kuac_audio_enable[] = "/sys/devices/platform/audiobridge/bridge%d/bridge_isolated";
++	char uac_audio_path[KpathLen];
++	if (snprintf(uac_audio_path, KpathLen, kuac_audio_enable, 0) != strlen(uac_audio_path)) {
++		printf("Set uac_audio_path path fail.\n");
++	}
++	if(!write_value(uac_audio_path,enable))
++		printf("Set uac_audio fail\n");
++
++	if (snprintf(uac_audio_path, KpathLen, kuac_audio_enable, 1) != strlen(uac_audio_path)) {
++		printf("Set uac_audio_path path fail.\n");
++	}
++	if(!write_value(uac_audio_path,enable))
++		printf("Set uac_audio fail\n");
++
++  return true;
++}
++
+ struct pcm_worker {
+ 	struct msg_transport transport;
+ 	pthread_t thread;
+@@ -284,6 +322,8 @@ static void pcm_worker_routine_exit(struct pcm_worker *worker) {
+ 		worker->pcm = NULL;
+ 	}
+ 	worker->eviction = true;
++	printf("disable uac virtual sound card\n");
++	uac_audio_enable(0);
+ 	debug("Exiting PCM worker %s", worker->addr);
+ }
+ 
+@@ -351,6 +391,8 @@ static void *pcm_worker_routine(void *arg) {
+ 			w->active = false;
+ 			w->pcm = NULL;
+ 			timeout = -1;
++			printf("disable uac virtual sound card\n");
++			uac_audio_enable(0);
+ 			continue;
+ 		}
+ 
+@@ -390,6 +432,8 @@ static void *pcm_worker_routine(void *arg) {
+ 			snd_pcm_uframes_t buffer_size;
+ 			snd_pcm_uframes_t period_size;
+ 			char *tmp;
++			printf("enable uac virtual sound card\n");
++			uac_audio_enable(1);
+ 
+ 			if (pcm_open(&w->pcm, w->transport.channels, w->transport.sampling,
+ 						&buffer_time, &period_time, &tmp) != 0) {
+diff --git a/utils/sco_handler.c b/utils/sco_handler.c
+index 6c60775..9d6cb75 100644
+--- a/utils/sco_handler.c
++++ b/utils/sco_handler.c
+@@ -8,6 +8,7 @@
+ #include <alsa/asoundlib.h>
+ #include "sco_handler.h"
+ #include <pthread.h>
++#define AVOID_UAC 1
+ 
+ /****************************************/
+ /*	Stream Direction:					*/
+-- 
+2.25.1
+

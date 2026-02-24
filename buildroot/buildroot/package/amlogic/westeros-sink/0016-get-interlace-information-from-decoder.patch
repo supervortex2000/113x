@@ -1,0 +1,66 @@
+From 7dcb47d6d6c3ed141d34f5c5d264b2c1458f32ce Mon Sep 17 00:00:00 2001
+From: Song Zhao <song.zhao@amlogic.com>
+Date: Mon, 5 Apr 2021 23:28:59 -0700
+Subject: [PATCH] get interlace information from decoder
+
+---
+ westeros-sink/v4l2/svp/aml-meson/svp-util.c | 1 +
+ westeros-sink/v4l2/westeros-sink-soc.c      | 9 ++++++++-
+ westeros-sink/v4l2/westeros-sink-soc.h      | 1 +
+ 3 files changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/westeros-sink/v4l2/svp/aml-meson/svp-util.c b/westeros-sink/v4l2/svp/aml-meson/svp-util.c
+index d589d74..632a54b 100644
+--- a/westeros-sink/v4l2/svp/aml-meson/svp-util.c
++++ b/westeros-sink/v4l2/svp/aml-meson/svp-util.c
+@@ -102,6 +102,7 @@ struct aml_vdec_ps_infos
+    uint32_t dpb_size;
+    uint32_t ref_frames;
+    uint32_t reorder_frames;
++   uint32_t field;
+ };
+ 
+ struct aml_vdec_cnt_infos
+diff --git a/westeros-sink/v4l2/westeros-sink-soc.c b/westeros-sink/v4l2/westeros-sink-soc.c
+index 31ee41f..be4537b 100644
+--- a/westeros-sink/v4l2/westeros-sink-soc.c
++++ b/westeros-sink/v4l2/westeros-sink-soc.c
+@@ -2064,7 +2064,12 @@ static void wstProcessEvents( GstWesterosSink *sink )
+          memset( &fmtIn, 0, sizeof(fmtIn));
+          bufferType= (sink->soc.isMultiPlane ? V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE : V4L2_BUF_TYPE_VIDEO_OUTPUT);
+          fmtIn.type= bufferType;
++         sink->soc.interlace = FALSE;
+          rc= IOCTL( sink->soc.v4l2Fd, VIDIOC_G_FMT, &fmtIn );
++	 if ( (sink->soc.isMultiPlane && fmtIn.fmt.pix_mp.field == V4L2_FIELD_INTERLACED) ||
++	      (!sink->soc.isMultiPlane && fmtIn.fmt.pix.field == V4L2_FIELD_INTERLACED) )
++            sink->soc.interlace = TRUE;
++         GST_DEBUG("interlace %d", sink->soc.interlace);
+ 
+          memset( &fmtOut, 0, sizeof(fmtOut));
+          bufferType= (sink->soc.isMultiPlane ? V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE : V4L2_BUF_TYPE_VIDEO_CAPTURE);
+@@ -4891,7 +4896,9 @@ static gpointer wstVideoOutputThread(gpointer data)
+                double frameRate;
+ 
+                frameRate= (sink->soc.frameRate > 0.0 ? sink->soc.frameRate : 30.0);
+-               currFramePTS= (1000000 / sink->soc.frameRate) * sink->soc.frameOutCount;
++               if (sink->soc.interlace)
++                  frameRate *= 2;
++               currFramePTS= (1000000 / frameRate) * sink->soc.frameOutCount;
+                currFramePTS += sink->positionSegmentStart / 1000;
+                frameTime= currFramePTS * 1000;
+             }
+diff --git a/westeros-sink/v4l2/westeros-sink-soc.h b/westeros-sink/v4l2/westeros-sink-soc.h
+index 05b271f..acb0ce0 100644
+--- a/westeros-sink/v4l2/westeros-sink-soc.h
++++ b/westeros-sink/v4l2/westeros-sink-soc.h
+@@ -215,6 +215,7 @@ struct _GstWesterosSinkSoc
+ 
+    gboolean disable_pts_calc;
+    gboolean ptsCalc;
++   gboolean interlace;
+    gboolean lowMemoryMode;
+    gboolean secureVideo;
+    gboolean useDmabufOutput;
+-- 
+2.24.1
+

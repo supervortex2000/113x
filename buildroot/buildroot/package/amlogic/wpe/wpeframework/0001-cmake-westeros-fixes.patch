@@ -1,0 +1,71 @@
+From 87692767907c47c8177cbadbc6fa422afed075fb Mon Sep 17 00:00:00 2001
+From: Pradeep Sriram <pradeep.sriram@amlogic.com>
+Date: Mon, 27 Jan 2020 16:02:53 -0800
+Subject: [PATCH] cmake westeros fixes
+
+---
+ cmake/modules/FindWaylandEGL.cmake     |  2 +-
+ cmake/modules/FindWesterosClient.cmake | 27 ++++++++++++++------------
+ 2 files changed, 16 insertions(+), 13 deletions(-)
+
+diff --git a/cmake/modules/FindWaylandEGL.cmake b/cmake/modules/FindWaylandEGL.cmake
+index eab9f03..f2fd99f 100644
+--- a/cmake/modules/FindWaylandEGL.cmake
++++ b/cmake/modules/FindWaylandEGL.cmake
+@@ -32,7 +32,7 @@
+ find_package(PkgConfig)
+ pkg_check_modules(WAYLAND_EGL wayland-egl)
+ 
+-find_library(WAYLAND_EGL_LIB NAMES wayland-egl
++find_library(WAYLAND_EGL_LIB NAMES Mali
+         HINTS ${WAYLAND_EGL_LIBDIR} ${WAYLAND_EGL_LIBRARY_DIRS})
+ 
+ if(WAYLAND_EGL_FOUND AND NOT TARGET WaylandEGL::WaylandEGL)
+diff --git a/cmake/modules/FindWesterosClient.cmake b/cmake/modules/FindWesterosClient.cmake
+index 03d5905..b4109f1 100644
+--- a/cmake/modules/FindWesterosClient.cmake
++++ b/cmake/modules/FindWesterosClient.cmake
+@@ -44,25 +44,28 @@ find_library(WESTEROS_CLIENT_LIB_SHELL_CLIENT NAMES westeros_simpleshell_client
+         HINTS ${PC_WESTEROS_LIBDIR} ${PC_WESTEROS_LIBRARY_DIRS}
+         )
+ 
++find_library(WESTEROS_CLIENT_LIB_SOC NAMES westeros_gl
++        HINTS ${PC_WESTEROS_LIBDIR} ${PC_WESTEROS_LIBRARY_DIRS}
++        )
++
++
+ find_path(WESTEROS_CLIENT_INCLUDE_DIRS NAMES westeros-compositor.h
+         HINTS ${PC_WESTEROS_INCLUDEDIR} ${PC_WESTEROS_INCLUDE_DIRS}
+         )
+ 
+-set (WESTEROS_CLIENT_LIBRARIES ${PC_WESTEROS_LIBRARIES} "${WESTEROS_CLIENT_LIB_SERVER}" "${WESTEROS_CLIENT_LIB_SERVER}" "${WESTEROS_CLIENT_LIB_CLIENT}" "${WESTEROS_CLIENT_LIB_CLIENT}")
++set (WESTEROS_CLIENT_LIBRARIES ${PC_WESTEROS_LIBRARIES} "${WESTEROS_CLIENT_LIB_SERVER}" "${WESTEROS_CLIENT_LIB_SERVER}" "${WESTEROS_CLIENT_LIB_CLIENT}" "${WESTEROS_CLIENT_LIB_CLIENT}" "${WESTEROS_CLIENT_LIB_SOC}" )
+ 
+ set (WESTEROS_CLIENT_FOUND ${PC_WESTEROS_FOUND})
+ 
+-if(WESTEROS_CLIENT_FOUND AND NOT TARGET WesterosClient::WesterosClient)
+-    set(WESTEROS_CLIENT_LIB_CLIENT_LINK_LIBRARIES "${WESTEROS_CLIENT_LIB}" "${WESTEROS_CLIENT_LIB_SHELL_CLIENT}" "${WESTEROS_CLIENT_LIB_BUFFER_CLIENT}")
+-    add_library(WesterosClient::WesterosClient UNKNOWN IMPORTED)
+-    set_target_properties(WesterosClient::WesterosClient PROPERTIES
+-            IMPORTED_LINK_INTERFACE_LANGUAGES "C"
+-            IMPORTED_LOCATION "${WESTEROS_CLIENT_LIB}"
+-            INTERFACE_INCLUDE_DIRECTORIES "${WESTEROS_CLIENT_INCLUDE_DIRS}"
+-            INTERFACE_COMPILE_OPTIONS "${WESTEROS_CLIENT_CFLAGS_OTHER}"
+-            INTERFACE_LINK_LIBRARIES "${WESTEROS_CLIENT_LIB_CLIENT_LINK_LIBRARIES}"
+-            )
+-endif()
++set(WESTEROS_CLIENT_LIB_CLIENT_LINK_LIBRARIES "${WESTEROS_CLIENT_LIB}" "${WESTEROS_CLIENT_LIB_SHELL_CLIENT}" "${WESTEROS_CLIENT_LIB_BUFFER_CLIENT}" "${WESTEROS_CLIENT_LIB_SOC}" )
++add_library(WesterosClient::WesterosClient UNKNOWN IMPORTED)
++set_target_properties(WesterosClient::WesterosClient PROPERTIES
++        IMPORTED_LINK_INTERFACE_LANGUAGES "C"
++        IMPORTED_LOCATION "${WESTEROS_CLIENT_LIB}"
++        INTERFACE_INCLUDE_DIRECTORIES "${WESTEROS_CLIENT_INCLUDE_DIRS}"
++        INTERFACE_COMPILE_OPTIONS "${WESTEROS_CLIENT_CFLAGS_OTHER}"
++        INTERFACE_LINK_LIBRARIES "${WESTEROS_CLIENT_LIB_CLIENT_LINK_LIBRARIES}"
++        )
+ 
+ include(FindPackageHandleStandardArgs)
+ FIND_PACKAGE_HANDLE_STANDARD_ARGS(PC_WESTEROS DEFAULT_MSG WESTEROS_CLIENT_FOUND)
+-- 
+2.24.1
+

@@ -1,0 +1,4 @@
+config BR2_PACKAGE_AUDIO_EFFECTS
+    bool "AML_EQ_DRC_EFFECTS"
+    help
+     AML_EQ_DRC_EFFECTS

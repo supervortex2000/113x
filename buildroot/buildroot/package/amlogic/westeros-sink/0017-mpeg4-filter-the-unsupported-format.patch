@@ -1,0 +1,56 @@
+From 22f5deb37e66e9aa0b0dacf5c4b00fbbc220f14c Mon Sep 17 00:00:00 2001
+From: Song Zhao <song.zhao@amlogic.com>
+Date: Tue, 6 Apr 2021 08:49:43 -0700
+Subject: [PATCH] mpeg4: filter the unsupported format
+
+---
+ westeros-sink/v4l2/westeros-sink-soc.c | 14 ++++++++++++++
+ westeros-sink/westeros-sink.c          |  5 ++++-
+ 2 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/westeros-sink/v4l2/westeros-sink-soc.c b/westeros-sink/v4l2/westeros-sink-soc.c
+index be4537b..f9d816f 100644
+--- a/westeros-sink/v4l2/westeros-sink-soc.c
++++ b/westeros-sink/v4l2/westeros-sink-soc.c
+@@ -990,8 +990,22 @@ gboolean gst_westeros_sink_soc_accept_caps( GstWesterosSink *sink, GstCaps *caps
+                      sink->soc.inputFormat= V4L2_PIX_FMT_MPEG2;
+                      break;
+                   case 4:
++                  {
++#ifdef USE_AMLOGIC_MESON
++                     int sprite_warping_points = -1;
++
++                     if ( gst_structure_get_int(structure, "sprite-warping-points", &sprite_warping_points) )
++                     {
++                        if (sprite_warping_points > 2) {
++                           result = FALSE;
++                           GST_WARNING ("sprite-warping-points not supported");
++                           return result;
++                        }
++                     }
++#endif
+                      sink->soc.inputFormat= V4L2_PIX_FMT_MPEG4;
+                      break;
++                  }
+                }
+             }
+             {
+diff --git a/westeros-sink/westeros-sink.c b/westeros-sink/westeros-sink.c
+index 3545de5..33df0c2 100644
+--- a/westeros-sink/westeros-sink.c
++++ b/westeros-sink/westeros-sink.c
+@@ -1836,7 +1836,10 @@ static gboolean gst_westeros_sink_event(GstPad *pad, GstEvent *event)
+             #endif
+             if ( sink->passCaps || (!sink->videoStarted && sink->startAfterCaps) )
+             {
+-               gst_westeros_sink_soc_accept_caps( sink, caps );
++               if (!gst_westeros_sink_soc_accept_caps( sink, caps )) {
++                  passToDefault= FALSE;
++                  result= FALSE;
++               }
+             }
+          }
+          break;
+-- 
+2.24.1
+

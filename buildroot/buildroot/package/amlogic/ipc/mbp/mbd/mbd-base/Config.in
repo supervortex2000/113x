@@ -1,0 +1,6 @@
+config BR2_PACKAGE_MBD_BASE
+	bool "mbd base"
+	depends on BR2_PACKAGE_LINUX_OSAL
+	depends on BR2_PACKAGE_PMZ
+	help
+		ipc mbd base driver

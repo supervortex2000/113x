@@ -1,0 +1,35 @@
+config BR2_PACKAGE_ACENNA_NPU
+	bool "amlogic amazon npu driver git repo"
+	depends on BR2_LINUX_KERNEL	
+	help
+	  The git of amlogic npu driver git repo
+config BR2_PACKAGE_ACENNA_NPU_VERSION
+	string "amlogic amazon npu branch" 
+	depends on BR2_PACKAGE_ACENNA_NPU
+	help
+	  the branch of amlogic amazon npu driver
+
+config BR2_PACKAGE_ACENNA_NPU_GIT_URL
+	string "amlogic amazon npu driver git repo url"
+	depends on BR2_PACKAGE_ACENNA_NPU
+	help
+	  the URL of amlogic acenna npu driver git repo
+
+config BR2_PACKAGE_ACENNA_NPU_CUSTOM_TARBALL_LOCATION
+	string "amlogic amazon npu driver tarball url"
+	depends on BR2_PACKAGE_ACENNA_NPU
+	help
+	  the URL of amlogic amazon npu driver
+
+config BR2_PACKAGE_ACENNA_NPU_LOCAL
+	bool "amlogic acenna npu driver local"
+	depends on BR2_PACKAGE_ACENNA_NPU
+	help
+		acenna npu local
+
+config BR2_PACKAGE_ACENNA_NPU_LOCAL_PATH
+	string "amlogic acenna npu local path"
+	depends on BR2_PACKAGE_ACENNA_NPU_LOCAL
+	depends on BR2_PACKAGE_ACENNA_NPU
+	help
+		acenna npu local path

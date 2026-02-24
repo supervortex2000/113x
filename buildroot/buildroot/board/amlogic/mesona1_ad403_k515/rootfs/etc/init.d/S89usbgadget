@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# Copyright (c) 2021 Amlogic, Inc. All rights reserved.
+# This source code is subject to the terms and conditions defined in the file 'LICENSE' which is part of this source code package.
+# Description:  S89 usbgadget file
+#
+function start_usbgadget(){
+    #sleep 6
+    #cat /proc/device-tree/amlogic-dt-id  | grep "skt"
+    #if [ $? -eq 0 ]
+    #then
+    usb_dir=/sys/kernel/config/usb_gadget/amlogic
+    if [ ! -d ${usb_dir} ]
+    then
+    {
+        mkdir -p /sys/kernel/config
+        mount -t configfs none /sys/kernel/config
+
+        #As usb_monitor will write UDC file, must move usb_monitor after the script written to UDC
+        /usr/bin/usb_monitor &
+        echo "------------------------------------"
+        echo "usb usbgadget start: OK!"
+        echo "------------------------------------"
+    }&
+    fi
+    #fi
+}
+
+case "$1" in
+  start)
+	  start_usbgadget &
+		;;
+  netready|netup|netdown|netchange) ;;
+  *)
+	echo "Usage: $0 {start}"
+	exit 1
+esac
+
+exit $?

@@ -1,0 +1,44 @@
+#!/bin/sh
+
+HDCP_LSTORE=/sys/class/amhdmitx/amhdmitx0/hdcp_lstore
+HDCP_22="22"
+
+start() {
+	HDCP_KEY=`cat $HDCP_LSTORE`
+	result=$(echo $HDCP_KEY | grep "${HDCP_22}")
+	if [[ "$result" != "" ]]
+	then
+		echo "start hdcp_tx22"
+		/usr/bin/hdcp_tx22 -f /data/firmware.le &
+	fi
+}
+stop() {
+	HDCP_KEY=`cat $HDCP_LSTORE`
+	result=$(echo $HDCP_KEY | grep "${HDCP_22}")
+	if [[ "$result" != "" ]]
+	then
+		echo "stop hdcp_tx22"
+		killall hdcp_tx22
+	fi
+}
+restart() {
+	stop
+	start
+}
+
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  restart|reload)
+	restart
+	;;
+  *)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+esac
+
+exit $?

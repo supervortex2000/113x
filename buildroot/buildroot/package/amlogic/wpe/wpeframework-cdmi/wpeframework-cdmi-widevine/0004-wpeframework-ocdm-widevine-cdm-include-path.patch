@@ -1,0 +1,13 @@
+diff --git a/cmake/FindWideVine.cmake b/cmake/FindWideVine.cmake
+index 3cb05f6..21a5b33 100644
+--- a/cmake/FindWideVine.cmake
++++ b/cmake/FindWideVine.cmake
+@@ -29,7 +29,7 @@
+ # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
+ #
+ 
+-find_path (WIDEVINE_INCLUDE_DIRS NAME cdm.h PATHS "usr/include/" PATH_SUFFIXES "openssl")
++find_path (WIDEVINE_INCLUDE_DIRS NAME cdm.h PATHS "/usr/include/widevine/")
+ 
+ find_library(WIDEVINE_LIBRARIES NAME widevine_ce_cdm_shared PATH_SUFFIXES lib)
+ 

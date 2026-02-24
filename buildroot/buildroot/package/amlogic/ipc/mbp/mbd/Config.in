@@ -1,0 +1,13 @@
+menu "mbd"
+source "package/amlogic/ipc/mbp/mbd/mbd-base/Config.in"
+source "package/amlogic/ipc/mbp/mbd/mbd-cve/Config.in"
+source "package/amlogic/ipc/mbp/mbd/mbd-ge2d/Config.in"
+source "package/amlogic/ipc/mbp/mbd/mbd-region/Config.in"
+source "package/amlogic/ipc/mbp/mbd/mbd-venc/Config.in"
+source "package/amlogic/ipc/mbp/mbd/mbd-vpu/Config.in"
+source "package/amlogic/ipc/mbp/mbd/mbd-adla/Config.in"
+source "package/amlogic/ipc/mbp/mbd/mbd-dewarp/Config.in"
+source "package/amlogic/ipc/mbp/mbd/mbd-camera/Config.in"
+source "package/amlogic/ipc/mbp/mbd/mbd-audio/Config.in"
+source "package/amlogic/ipc/mbp/mbd/mbd-ppu/Config.in"
+endmenu

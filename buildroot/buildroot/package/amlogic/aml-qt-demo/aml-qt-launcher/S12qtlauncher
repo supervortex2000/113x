@@ -1,0 +1,24 @@
+#!/bin/sh
+
+DISP_MODE=/sys/class/display/mode
+echo "panel" > $DISP_MODE
+export QT_PLUGIN_PATH=/usr/lib/plugins
+
+case "$1" in
+    stop);;
+    restart);;
+    start)
+        sleep 2s
+        fbset -fb /dev/fb0 -g 720 720 720 1440 32
+        #call qt demo as launcher
+        /usr/share/examples/widgets/animation/easing/easing &
+        #and close osd1
+        echo 0 0 719 719 > /sys/class/graphics/fb0/window_axis
+        echo 0 0 719 719 > /sys/class/graphics/fb0/free_scale_axis
+        echo 0x10001 > /sys/class/graphics/fb0/free_scale
+        echo 0 > /sys/class/graphics/fb0/blank
+        echo 1 > /sys/class/graphics/fb1/blank
+        ;;
+esac
+
+exit $?

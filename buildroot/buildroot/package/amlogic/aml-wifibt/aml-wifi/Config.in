@@ -1,0 +1,106 @@
+config BR2_PACKAGE_AML_WIFI
+	bool "aml_wifi"
+	depends on BR2_LINUX_KERNEL
+	help
+	  aml_wifi driver
+
+config BR2_PACKAGE_AML_WIFI_LOCAL
+	bool "aml_wifi local"
+	help
+		aml_wifi local
+
+config BR2_PACKAGE_AML_WIFI_STANDALONE
+	bool "standalone kernel module"
+	depends on BR2_PACKAGE_AML_WIFI
+	help
+	  compile ko directly
+
+config BR2_PACKAGE_AML_WIFI_GIT_VERSION
+	string "aml_wifi branch"
+	depends on BR2_PACKAGE_AML_WIFI
+	help
+		Branch for aml_wifi
+
+config BR2_PACKAGE_AML_WIFI_LOCAL_PATH
+	string "aml_wifi local path"
+	depends on BR2_PACKAGE_AML_WIFI_LOCAL
+	help
+		aml_wifi local path
+
+config BR2_PACKAGE_AML_WIFI_GIT_REPO_URL
+	string "aml_wifi git"
+	depends on BR2_PACKAGE_AML_WIFI
+	help
+		aml_wifi git
+
+
+config BR2_PACKAGE_AML_WIFI_W1U
+	bool "aml_wifi w1u"
+	depends on BR2_LINUX_KERNEL
+	help
+	  aml_wifi w1u driver
+
+config BR2_PACKAGE_AML_WIFI_W1U_LOCAL
+	bool "aml_wifi w1u local"
+	help
+		aml_wifi w1u local
+
+config BR2_PACKAGE_AML_WIFI_W1U_STANDALONE
+	bool "standalone kernel module"
+	depends on BR2_PACKAGE_AML_WIFI_W1U
+	help
+	  compile ko directly
+
+config BR2_PACKAGE_AML_WIFI_W1U_GIT_VERSION
+	string "aml_wifi branch"
+	depends on BR2_PACKAGE_AML_WIFI_W1U
+	help
+		Branch for aml_wifi
+
+config BR2_PACKAGE_AML_WIFI_W1U_LOCAL_PATH
+	string "aml_wifi local path"
+	depends on BR2_PACKAGE_AML_WIFI_W1U_LOCAL
+	help
+		aml_wifi w1u local path
+
+config BR2_PACKAGE_AML_WIFI_W1U_GIT_REPO_URL
+    string "aml_wifi w1u git"
+    depends on BR2_PACKAGE_AML_WIFI_W1U
+    help
+        aml_wifi w1u git
+
+
+config BR2_PACKAGE_AML_WIFI_W2
+	bool "aml_wifi w2"
+	depends on BR2_LINUX_KERNEL
+	help
+	  aml_wifi w2 driver
+
+config BR2_PACKAGE_AML_WIFI_W2_LOCAL
+	bool "aml_wifi w2 local"
+	help
+		aml_wifi w2 local
+
+config BR2_PACKAGE_AML_WIFI_W2_STANDALONE
+	bool "standalone kernel module"
+	depends on BR2_PACKAGE_AML_WIFI_W2
+	help
+	  compile ko directly
+
+config BR2_PACKAGE_AML_WIFI_W2_GIT_VERSION
+	string "aml_wifi branch"
+	depends on BR2_PACKAGE_AML_WIFI_W2
+	help
+		Branch for aml_wifi w2
+
+config BR2_PACKAGE_AML_WIFI_W2_LOCAL_PATH
+	string "aml_wifi local path"
+	depends on BR2_PACKAGE_AML_WIFI_W2_LOCAL
+	help
+		aml_wifi w2 local path
+
+config BR2_PACKAGE_AML_WIFI_W2_GIT_REPO_URL
+	string "aml_wifi w2 git"
+	depends on BR2_PACKAGE_AML_WIFI_W2
+	help
+		aml_wifi w2 git

@@ -1,0 +1,4 @@
+menu "aml-qt-demo"
+source "package/amlogic/aml-qt-demo/aml-qt-camera/Config.in"
+source "package/amlogic/aml-qt-demo/aml-qt-launcher/Config.in"
+endmenu

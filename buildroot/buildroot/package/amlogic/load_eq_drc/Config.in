@@ -1,0 +1,4 @@
+config BR2_PACKAGE_LOAD_EQ_DRC
+    bool "LOAD_EQ_DRC"
+    help
+      Load EQ&DRC params

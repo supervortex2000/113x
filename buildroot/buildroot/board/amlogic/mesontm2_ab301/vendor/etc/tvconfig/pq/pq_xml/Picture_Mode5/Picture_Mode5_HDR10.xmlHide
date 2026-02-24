@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Form name="Picture_Mode5_HDR10" platform="txlx" commands="">
+<Group num="0" val="0">
+<Page tab_title="" layout="10x4">
+<Control ui_type="" name="Standard_HDR" value="10" Backlight="100" Brightness="50" Contrast="50" Saturation="50" Sharpness="50" Hue="50" ColorTemperature="0" RedGain="0" GreenGain="0" BlueGain="0" step="4" GammaMidLuminance="0" NR="2" MpegNR="1" DynamicContrast="2" LocalContrast="2" CmLevel="1" BlackExtension="0" DolbyMode="-1"/>
+<Control ui_type="" name="Vivid_HDR" value="9" Backlight="100" Brightness="50" Contrast="55" Saturation="60" Sharpness="60" Hue="50" ColorTemperature="2" RedGain="0" GreenGain="0" BlueGain="0" step="4" GammaMidLuminance="0" NR="2" MpegNR="1" DynamicContrast="2" LocalContrast="2" CmLevel="1" BlackExtension="1" DolbyMode="-1"/>
+<Control ui_type="" name="Cinema_HDR" value="11" Backlight="100" Brightness="50" Contrast="50" Saturation="50" Sharpness="50" Hue="50" ColorTemperature="1" RedGain="0" GreenGain="0" BlueGain="0" step="4" GammaMidLuminance="0" NR="2" MpegNR="1" DynamicContrast="0" LocalContrast="0" CmLevel="2" BlackExtension="0" DolbyMode="-1"/>
+<Control ui_type="" name="Sport_HDR" value="12" Backlight="100" Brightness="50" Contrast="50" Saturation="50" Sharpness="60" Hue="50" ColorTemperature="1" RedGain="0" GreenGain="0" BlueGain="0" step="4" GammaMidLuminance="0" NR="1" MpegNR="1" DynamicContrast="2" LocalContrast="2" CmLevel="2" BlackExtension="0" DolbyMode="-1"/>
+<Control ui_type="" name="Game_HDR" value="13" Backlight="100" Brightness="50" Contrast="50" Saturation="50" Sharpness="40" Hue="50" ColorTemperature="0" RedGain="0" GreenGain="0" BlueGain="0" step="4" GammaMidLuminance="0" NR="0" MpegNR="0" DynamicContrast="2" LocalContrast="2" CmLevel="1" BlackExtension="0" DolbyMode="-1"/>
+</Page>                                                                                                                                                                                                                                                                                                                                                                         
+</Group>                                                                                                                                                                                                                                                                                                                                                                        
+</Form>
+

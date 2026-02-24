@@ -1,0 +1,36 @@
+diff -Nur bluez-alsa-1.2.0-orig/src/bluez-a2dp.h bluez-alsa-1.2.0/src/bluez-a2dp.h
+--- bluez-alsa-1.2.0-orig/src/bluez-a2dp.h	2022-06-26 11:05:39.318318198 +0800
++++ bluez-alsa-1.2.0/src/bluez-a2dp.h	2022-07-02 00:50:19.572326170 +0800
+@@ -17,15 +17,15 @@
+ 
+ #include "a2dp-codecs.h"
+ 
+-const a2dp_sbc_t bluez_a2dp_sbc;
++extern const a2dp_sbc_t bluez_a2dp_sbc;
+ #if ENABLE_MP3
+-const a2dp_mpeg_t bluez_a2dp_mpeg;
++extern const a2dp_mpeg_t bluez_a2dp_mpeg;
+ #endif
+ #if ENABLE_AAC
+-const a2dp_aac_t bluez_a2dp_aac;
++extern const a2dp_aac_t bluez_a2dp_aac;
+ #endif
+ #if ENABLE_APTX
+-const a2dp_aptx_t bluez_a2dp_aptx;
++extern const a2dp_aptx_t bluez_a2dp_aptx;
+ #endif
+ 
+ #endif
+diff -Nur bluez-alsa-1.2.0-orig/src/bluez-iface.h bluez-alsa-1.2.0/src/bluez-iface.h
+--- bluez-alsa-1.2.0-orig/src/bluez-iface.h	2022-06-26 11:05:39.318318198 +0800
++++ bluez-alsa-1.2.0/src/bluez-iface.h	2022-07-02 00:50:39.464438845 +0800
+@@ -13,7 +13,7 @@
+ 
+ #include <gio/gio.h>
+ 
+-const GDBusInterfaceInfo bluez_iface_endpoint;
+-const GDBusInterfaceInfo bluez_iface_profile;
++extern const GDBusInterfaceInfo bluez_iface_endpoint;
++extern const GDBusInterfaceInfo bluez_iface_profile;
+ 
+ #endif

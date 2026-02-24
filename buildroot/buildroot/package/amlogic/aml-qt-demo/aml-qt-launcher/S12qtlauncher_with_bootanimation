@@ -1,0 +1,28 @@
+#!/bin/sh
+
+DISP_MODE=/sys/class/display/mode
+echo "panel" > $DISP_MODE
+export QT_PLUGIN_PATH=/usr/lib/plugins
+
+case "$1" in
+    stop);;
+    restart);;
+    start)
+        #Sleep 1s to wait for boot animation initialization to complete
+        sleep 1s
+        fbset -fb /dev/fb0 -g 720 720 720 1440 32
+        #Call qt demo as launcher
+        /usr/share/examples/widgets/animation/easing/easing &
+        #Sleep 2s to wait qt initialization to complete.
+        #Other purposes are to make boot animation last longer.
+        sleep 2s
+        echo 0 0 719 719 > /sys/class/graphics/fb0/window_axis
+        echo 0 0 719 719 > /sys/class/graphics/fb0/free_scale_axis
+        echo 0x10001 > /sys/class/graphics/fb0/free_scale
+        echo 0 > /sys/class/graphics/fb0/blank
+        echo 1 > /sys/class/graphics/fb1/blank
+        boot-animation -stop &
+        ;;
+esac
+
+exit $?

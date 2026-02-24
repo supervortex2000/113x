@@ -1,0 +1,40 @@
+software =
+{
+	version = "1.0.1";
+	hardware-compatibility: [ "1.0" ];
+	files: (
+		{
+			filename = "rootfs.tgz";
+			path = "/tmp/rootfs.tgz";
+		}
+	);
+	scripts: (
+		{
+			filename = "update.sh";
+			type = "shellscript";
+		}
+	);
+	images: (
+		{
+			filename = "dtb.img";
+			device = "/dev/dtb";
+		},
+		{
+			filename = "boot.img.encrypt";
+			device = "/dev/mtd5";
+			type = "flash";
+		},
+		{
+			filename = "u-boot.bin.aml.encrypt";
+			device = "/dev/mtd0";
+			offset = "1792K";
+			type = "flash";
+		}
+	);
+	uboot: (
+		{
+			name = "upgrade_step";
+			value = "1";
+		}
+	);
+}

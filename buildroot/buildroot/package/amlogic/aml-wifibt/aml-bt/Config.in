@@ -1,0 +1,13 @@
+config BR2_PACKAGE_AML_BT
+	bool "aml bt for bluez"
+	depends on BR2_LINUX_KERNEL
+	help
+	aml bt
+
+config BR2_PACKAGE_AML_BT_LOCAL_PATH
+	string "aml bt codes local path"
+	depends on BR2_PACKAGE_AML_BT
+	help
+		aml bt codes local path
+
+source "package/amlogic/aml-wifibt/aml-bt/aml-bt-ct/Config.in"

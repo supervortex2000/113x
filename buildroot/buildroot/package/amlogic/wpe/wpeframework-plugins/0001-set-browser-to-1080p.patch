@@ -1,0 +1,25 @@
+From cb8cd97aed2c3b088f7a339452e96738344c120e Mon Sep 17 00:00:00 2001
+From: Pradeep Sriram <pradeep.sriram@amlogic.com>
+Date: Wed, 12 Feb 2020 11:54:28 -0800
+Subject: [PATCH] set browser to 1080p
+
+---
+ WebKitBrowser/CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/WebKitBrowser/CMakeLists.txt b/WebKitBrowser/CMakeLists.txt
+index a15ea74..7270e23 100644
+--- a/WebKitBrowser/CMakeLists.txt
++++ b/WebKitBrowser/CMakeLists.txt
+@@ -19,7 +19,7 @@ set(PLUGIN_WEBKITBROWSER_LOCALSTORAGE "" CACHE STRING "HTML5 local storage path"
+ set(PLUGIN_WEBKITBROWSER_COOKIESTORAGE "" CACHE STRING "Browser cookie storage path")
+ set(PLUGIN_WEBKITBROWSER_WINDOWCLOSE false CACHE STRING "Allow window close")
+ set(PLUGIN_WEBKITBROWSER_WEBGL true CACHE STRING "Enable WebGL")
+-set(PLUGIN_WEBKITBROWSER_RESOLUTION "720p" CACHE STRING "Browser resolution")
++set(PLUGIN_WEBKITBROWSER_RESOLUTION "1080p" CACHE STRING "Browser resolution")
+ set(PLUGIN_WEBKITBROWSER_THREADEDPAINTING "1" CACHE STRING "Threads for the Threaded Painting")
+ set(PLUGIN_YOUTUBE_USERAGENT ${PLUGIN_WEBKITBROWSER_USERAGENT} CACHE STRING "User agent string YouTube")
+ set(PLUGIN_UX_AUTOSTART false CACHE STRING "Automatically start UX plugin")
+-- 
+2.24.1
+

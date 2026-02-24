@@ -1,0 +1,31 @@
+#
+# v4l2-uvm-vdin-test
+#
+V4L2_UVM_VDIN_TEST_VERSION = 0.1
+V4L2_UVM_VDIN_TEST_SITE = $(TOPDIR)/../vendor/amlogic/aml_vdin/v4l2-uvm-vdin-test/src
+V4L2_UVM_VDIN_TEST_SITE_METHOD = local
+
+V4L2_UVM_VDIN_TEST_DEPENDENCIES += ffmpeg
+V4L2_UVM_VDIN_TEST_DEPENDENCIES += libdrm
+V4L2_UVM_VDIN_TEST_DEPENDENCIES += avsync-lib
+V4L2_UVM_VDIN_TEST_DEPENDENCIES += aml-tvserver
+
+ifneq ($(BR2_PACKAGE_LIBSECMEM),y)
+V4L2_UVM_VDIN_TEST_DEPENDENCIES  += libsecmem-bin
+else
+V4L2_UVM_VDIN_TEST_DEPENDENCIES  += libsecmem
+endif
+
+define V4L2_UVM_VDIN_TEST_BUILD_CMDS
+	$(TARGET_CONFIGURE_OPTS) $(MAKE) CC=$(TARGET_CC) -C $(@D)/
+endef
+
+define V4L2_UVM_VDIN_TEST_INSTALL_TARGET_CMDS
+	$(TARGET_CONFIGURE_OPTS) $(MAKE) CC=$(TARGET_CC) -C $(@D)/ install
+endef
+
+define V4L2_UVM_VDIN_TEST_INSTALL_CLEAN_CMDS
+    $(MAKE) CC=$(TARGET_CC) -C $(@D) clean
+endef
+
+$(eval $(generic-package))

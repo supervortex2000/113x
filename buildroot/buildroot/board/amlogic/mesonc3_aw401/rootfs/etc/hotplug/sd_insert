@@ -1,0 +1,26 @@
+#!/bin/sh
+format=$(blkid /dev/mmcblk0p1|awk -F'TYPE="' '{print $2}'|awk -F'"' '{print $1}')
+mount_point="mmcblk0p1"
+DEVNAME="/dev/mmcblk0p1"
+#DEVNAME=${DEVNAME##*/}
+VFAT=vfat
+NTFS=ntfs
+EXFAT=exfat
+
+
+if [ -n $mount_point ];then
+    mkdir -p /media/$mount_point
+    echo "format:$format"
+    if [ "$format" = "$EXFAT" ];then
+        echo "format is exfat"
+        mount -t exfat $DEVNAME /media/$mount_point
+    elif [ "$format" = "$NTFS" ];then
+        echo "format is ntfs"
+        ntfs-3g $DEVNAME /media/$mount_point
+    elif [ "$format" = "$VFAT" ];then
+        echo "format is fat32(vfat)"
+        mount -t vfat $DEVNAME /media/$mount_point
+    else
+        echo "tf format undefined"
+    fi
+fi

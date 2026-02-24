@@ -1,0 +1,4 @@
+config BR2_PACKAGE_AML_HALHDMICEC
+	bool  "Enable Amlogic Hdmi CEC hal"
+	select  BR2_PACKAGE_RSYSLOG
+	default n

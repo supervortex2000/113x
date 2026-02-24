@@ -1,0 +1,205 @@
+diff --git a/DIALServer/DIALServer.cpp b/DIALServer/DIALServer.cpp
+index a6faa13..fb8d170 100644
+--- a/DIALServer/DIALServer.cpp
++++ b/DIALServer/DIALServer.cpp
+@@ -292,51 +292,44 @@ namespace Plugin {
+ 	 *         be retrieved, or out-of-memory. The caller must free the returned
+ 	 *         memory.
+ 	 */
+-	static char * get_local_address(char *ip_addr) {
++	static bool  get_mac_address(char *ip_addr,char *macaddr) {
+ #define HW_ADDRSTRLEN 18
+ 		struct ifconf ifc;
+ 		char buf[4096];
+-		char * hw_addr = NULL;
+ 		int s;
+         unsigned int i;
+ 		if (-1 == (s = socket(AF_INET, SOCK_DGRAM, 0))) {
+-		    perror("socket");
+-		    exit(1);
++		    return false;
+ 		}
+ 		ifc.ifc_len = sizeof(buf);
+ 		ifc.ifc_buf = buf;
+ 		if (0 > ioctl(s, SIOCGIFCONF, &ifc)) {
+-		    perror("SIOCGIFCONF");
+-		    exit(1);
++		    return false;
+ 		}
+ 		if (ifc.ifc_len == sizeof(buf)) {
+-		    fprintf(stderr, "SIOCGIFCONF output too long");
+-		    exit(1);
++		    return false;
+ 		}
+ 		for (i = 0; i < ifc.ifc_len/sizeof(ifc.ifc_req[0]); i++) {
+ 		    strncpy(ip_addr,
+ 		           inet_ntoa(((struct sockaddr_in *)(&ifc.ifc_req[i].ifr_addr))->sin_addr), sizeof(ip_addr) - 1);
+ 		    if (0 > ioctl(s, SIOCGIFFLAGS, &ifc.ifc_req[i])) {
+-		        perror("SIOCGIFFLAGS");
+-		        exit(1);
++		        return false;
+ 		    }
+ 		    if (ifc.ifc_req[i].ifr_flags & IFF_LOOPBACK) {
+ 		        // don't use loopback interfaces
+ 		        continue;
+ 		    }
+ 		    if (0 > ioctl(s, SIOCGIFHWADDR, &ifc.ifc_req[i])) {
+-		        perror("SIOCGIFHWADDR");
+-		        exit(1);
++		        return false;
+ 		    }
+ 		    // FIXME: How do I figure out what type of interface this is in order to
+ 		    // cast the struct sockaddr ifr_hraddr to the proper type and extract the
+ 		    // hardware address?
+ 		    //
+ 		    // Make sure this is correct for the target device and platform.
+-		    hw_addr = (char*)malloc(HW_ADDRSTRLEN + 1);
+-		    if (hw_addr == NULL)
++		    if (macaddr == NULL)
+ 		        break;
+-		    sprintf(hw_addr, "%02x:%02x:%02x:%02x:%02x:%02x",
++		    sprintf(macaddr, "%02x:%02x:%02x:%02x:%02x:%02x",
+ 		            (unsigned char)ifc.ifc_req[i].ifr_hwaddr.sa_data[0],
+ 		            (unsigned char)ifc.ifc_req[i].ifr_hwaddr.sa_data[1],
+ 		            (unsigned char)ifc.ifc_req[i].ifr_hwaddr.sa_data[2],
+@@ -346,42 +339,110 @@ namespace Plugin {
+ 		    break;
+ 		}
+ 		close(s);
+-		return hw_addr;
++		return true;
+ 	}
++    static bool get_interface_addr(const char* eth, char *ipaddr)
++    {
++        int sock_fd;
++        struct  sockaddr_in my_addr;
++        struct ifreq ifr;
++
++        if ((sock_fd = socket(PF_INET, SOCK_DGRAM, 0)) == -1) {
++        return false;
++        }
++
++        strncpy(ifr.ifr_name, eth, IF_NAMESIZE);
++        ifr.ifr_name[IFNAMSIZ-1]=0;
++
++        if (ioctl(sock_fd, SIOCGIFADDR, &ifr) < 0) {
++        return false;
++        }
++
++        memcpy(&my_addr, &ifr.ifr_addr, sizeof(my_addr));
++        strcpy(ipaddr, inet_ntoa(my_addr.sin_addr));
++        close(sock_fd);
++        return true;
++    }
+ 
+     /* virtual */ const string DIALServer::Initialize(PluginHost::IShell* service)
+     {
+         string result;
+-
++        bool bhasnetwork = false;
++        char hostip[256] ={0};
++        char c_macaddr[256] ={0};
++        string MacAddress ="";
++
++        char ipaddr[128];
++        string  urlwithoutport;
++        string  urlwithport;
+         ASSERT(_service == NULL);
+-
+         _config.FromString(service->ConfigLine());
+ 
+         // get an interface with a public IP address, then we will have a proper MAC address..
+         Core::NodeId selectedNode = Plugin::Config::IPV4UnicastNode(_config.Interface.Value());
+-
+         if (selectedNode.IsValid() == false) {
++            if (get_interface_addr("eth0",(char *)hostip))
++            {
++                bhasnetwork = true;
++            }
++            else if (get_interface_addr("wlan0",(char *)hostip))
++            {
++                bhasnetwork = true;
++            }
++         }
++        if ((selectedNode.IsValid() == false) && (!bhasnetwork)) {
+             // Oops no way we can operate...
+             result = _T("No DIALInterface available.");
+         } else {
+             const uint8_t* rawId(Core::SystemInfo::Instance().RawDeviceId());
+-            const string deviceId(Core::SystemInfo::Instance().Id(rawId, ~0));
++            string deviceId(Core::SystemInfo::Instance().Id(rawId, ~0));
+ 			string str_port=":80";
+             _dialURL = Core::URL(service->Accessor());
+-            _dialURL.Host(selectedNode.HostAddress());
++            if ((bhasnetwork) && (strstr(service->Accessor().c_str(), "http")==NULL))
++            {
++                string  dailser = string(_T("http://")) + string(_T(hostip)) + string(_T(":80/Service/DIALServer"));
++                _dialURL = Core::URL(dailser);
++            }
++            if (bhasnetwork)
++            {
++                string  host= _T(hostip);
++                _dialURL.Host(host);
++            }
++            else
++                _dialURL.Host(selectedNode.HostAddress());
+             _dialPath = '/' + _dialURL.Path().Value();
+ 
+             // TODO: THis used to be the MAC, but I think  it is just a unique number, otherwise, we need the MAC
+             //       that goes with the selectedNode !!!!
+             //_dialServiceImpl = new DIALServerImpl(deviceId, _dialURL.Text(), _DefaultAppInfoPath);
+ 
+-			char* ipaddr = const_cast<char*>(selectedNode.HostAddress().c_str());
+-            string  urlwithoutport = "http://"+selectedNode.HostAddress()+_dialPath;
+-            string  urlwithport = "http://"+selectedNode.HostAddress()+str_port+_dialPath;
++            if (!bhasnetwork)
++            {
++                strncpy(ipaddr,selectedNode.HostAddress().c_str(),sizeof(ipaddr));
++                urlwithoutport = "http://"+selectedNode.HostAddress()+_dialPath;
++                urlwithport = "http://"+selectedNode.HostAddress()+str_port+_dialPath;
++            }
++            else
++            {
++                strncpy(ipaddr,hostip,sizeof(ipaddr));
++                string  host= _T(hostip);
++                urlwithoutport = "http://"+ host +_dialPath;
++                urlwithport = "http://"+host+str_port+_dialPath;
++            }
++            if (get_mac_address(ipaddr,c_macaddr))
++            {
++                MacAddress= _T(c_macaddr);
++                deviceId = deviceId+MacAddress;
++                deviceId.erase(std::remove(deviceId.begin(), deviceId.end(), ':'), deviceId.end());
++            }
+ 			if (urlwithoutport.compare(_dialURL.Text()))
+-                _dialServiceImpl = new DIALServerImpl(get_local_address(ipaddr), _dialURL.Text(), _DefaultAppInfoPath);
+-			else
+-				_dialServiceImpl = new DIALServerImpl(get_local_address(ipaddr), urlwithport, _DefaultAppInfoPath);
++            {
++                _dialServiceImpl = new DIALServerImpl(MacAddress, _dialURL.Text(), _DefaultAppInfoPath);
++
++            }
++			else{
++				_dialServiceImpl = new DIALServerImpl(MacAddress, urlwithport, _DefaultAppInfoPath);
++            }
+ 
+             ASSERT(_dialServiceImpl != nullptr);
+ 
+@@ -411,8 +472,7 @@ namespace Plugin {
+                 + deviceId + _T("</UDN>")
+                 + ( _config.UPC.IsSet() == true ? _T("<UPC>") + _config.UPC.Value() + _T("</UPC>") : _T("") )
+                 +            _T("</device>")
+-                             _T("</root>");
+-
++                +            _T("</root>");
+             // Create a list of all servicable Apps:
+             auto index(_config.Apps.Elements());
+ 
+@@ -434,7 +494,6 @@ namespace Plugin {
+             // Register the sink *AFTER* the apps have been created so the apps will receive the
+             // switchboard, if it is already active and configured !!!
+             _sink.Register(service, _config.WebServer.Value(), _config.SwitchBoard.Value());
+-
+             _adminLock.Unlock();
+         }
+ 

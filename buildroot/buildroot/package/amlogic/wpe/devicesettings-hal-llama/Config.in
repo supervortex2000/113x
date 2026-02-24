@@ -1,0 +1,8 @@
+menuconfig BR2_PACKAGE_DEVICESETTINGS_HAL_LLAMA
+	bool "devicesettings-hal-llama"
+	select BR2_PACKAGE_DEVICESETTINGS_HAL_HEADERS
+	select BR2_PACKAGE_FPDRIVERLIB
+	select BR2_PACKAGE_AML_TVSERVER
+	help
+	   rdk devicesettings-hal-llama .
+

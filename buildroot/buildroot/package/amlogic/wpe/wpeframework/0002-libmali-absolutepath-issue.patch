@@ -1,0 +1,14 @@
+diff --git a/Source/compositorclient/Wayland/CMakeLists.txt b/Source/compositorclient/Wayland/CMakeLists.txt
+index 8132128..201e3db 100644
+--- a/Source/compositorclient/Wayland/CMakeLists.txt
++++ b/Source/compositorclient/Wayland/CMakeLists.txt
+@@ -41,7 +41,7 @@ endif ()
+ target_link_libraries(${TARGET}
+     PRIVATE
+         CompileSettingsDebug::CompileSettingsDebug
+-        WaylandEGL::WaylandEGL
++        libMali.so
+         ${EGL_LIBRARIES}
+         ${NAMESPACE}Core::${NAMESPACE}Core
+         WaylandClient::WaylandClient)
+

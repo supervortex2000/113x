@@ -1,0 +1,45 @@
+# WPE Framework
+source "package/amlogic/wpe/wpeframework/Config.in"
+
+# WPE Framework Generators
+source "package/amlogic/wpe/wpeframework-tools/Config.in"
+
+# WPE WebKit
+source "package/amlogic/wpe/wpewebkit/Config.in"
+
+if BR2_PACKAGE_WPEWEBKIT
+#source "package/amlogic/wpe/wpebackend/Config.in"
+source "package/amlogic/wpe/wpebackend-rdk/Config.in"
+source "package/amlogic/wpe/wpelauncher/Config.in"
+endif
+source "package/amlogic/wpe/rdkservices/Config.in"
+source "package/amlogic/wpe/rdkshell/Config.in"
+
+
+
+
+
+source "package/amlogic/aml_systemd/Config.in"
+#source "package/amlogic/wpe/iarmbus/Config.in"
+#source "package/amlogic/wpe/devicesettings-hal-headers/Config.in"
+#source "package/amlogic/wpe/devicesettings-hal-llama/Config.in"
+#source "package/amlogic/wpe/devicesettings/Config.in"
+#source "package/amlogic/wpe/iarmmgrs-hal-headers/Config.in"
+#source "package/amlogic/wpe/iarmmgrs-hal-llama/Config.in"
+#source "package/amlogic/wpe/iarmmgrs/Config.in"
+#source "package/amlogic/wpe/hdmicec-header/Config.in"
+#source "package/amlogic/wpe/hdmicec-hal-llama/Config.in"
+#source "package/amlogic/wpe/hdmicec/Config.in"
+#source "package/amlogic/wpe/rfc/Config.in"
+#source "package/amlogic/wpe/fpdriverlib/Config.in"
+#source "package/amlogic/wpe/log4c/Config.in"
+#source "package/amlogic/wpe/tr69hostif-headers/Config.in"
+#source "package/amlogic/wpe/trower-base64/Config.in"
+#source "package/amlogic/wpe/wdmp-c/Config.in"
+#source "package/amlogic/wpe/rdk-logger/Config.in"
+#source "package/amlogic/wpe/log4c/Config.in"
+
+# RDK Cobalt and Cobalt Plugin
+source "package/amlogic/wpe/rdkcobalt/Config.in"
+source "package/amlogic/wpe/rdkcobalt-plugin/Config.in"
+source "package/amlogic/wpe/wpeframework-cdmi/Config.in"

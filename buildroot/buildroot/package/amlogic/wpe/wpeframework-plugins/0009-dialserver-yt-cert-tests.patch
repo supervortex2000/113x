@@ -1,0 +1,215 @@
+diff --git a/DIALServer/DIALServer.cpp b/DIALServer/DIALServer.cpp
+index cdb34de..7b35f54 100644
+--- a/DIALServer/DIALServer.cpp
++++ b/DIALServer/DIALServer.cpp
+@@ -20,6 +20,10 @@
+ #include "DIALServer.h"
+ #include <sys/ioctl.h>
+ #include <sys/socket.h>
++#include <regex>
++#include <iostream>
++#include <string>
++using namespace std;
+ 
+ namespace WPEFramework {
+ namespace Plugin {
+@@ -34,6 +38,8 @@ namespace Plugin {
+     static const string _DefaultAppInfoDevice(_T("DeviceInfo.xml"));
+     static const string _DefaultRunningExtension(_T("Running"));
+     static const string _DefaultHiddingExtension(_T("Hidding"));
++    static const string _DefaultAddDataExtension(_T("dial_data"));
++    static const string _DefaultControlStopExtension(_T("Stop"));
+     static const string _SystemApp(_T("system"));
+ 
+     constexpr char kHideCommand[] = "hide";
+@@ -218,7 +224,7 @@ namespace Plugin {
+         bool isAtLeast2_1 = Version{2, 1, 0} <= version;
+         // allowSop is mandatory to be true starting from 2.1
+         string allowStop = isAtLeast2_1 == true || HasStartAndStop() == true ? "true" : "false";
+-        string dialVersion = " dialVer=\"2.1\" ";
++        string dialVersion = " dialVer=\"2.2\" ";
+ 
+         data = _T("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+                _T("<service xmlns=\"urn:dial-multiscreen-org:schemas:dial\"") + dialVersion + _T(">")
+@@ -228,10 +234,11 @@ namespace Plugin {
+             + allowStop + _T("\"/><state>")
+             // 2.1 spec adds "hidden" state. It also introduces "installable" state.
+             // We may consider adding support for it at some point - thanks to the Packager.
+-            + (running == true ? (hidden == true && isAtLeast2_1 == true ? _T("hidden") : _T("running")) : _T("stopped")) + _T("</state>")
++            + (running == true ? (hidden == true && isAtLeast2_1 == true ? _T("hidden") : _T("running")) : _T("stopped")) + _T("</state>\r\n")
+             // <link> element is DEPRECATED starting from 2.1
+-            + (running == true && isAtLeast2_1 == false ? _T("<link rel=\"run\" href=\"" + _DefaultControlExtension + "\"/>") : _T(""))
+-            + _T("<additionalData>");
++            + (running == true /*&& isAtLeast2_1 == false */ ? _T("<link rel=\"run\" href=\"" + _DefaultControlExtension + "\"/>") : _T(""))
++            + (running == false && hidden == false ? _T("<link rel=\"run\" href=\"Stop\"/>") : _T(""))
++            + _T("<additionalData>\n");
+         auto additionalData = AdditionalData();
+         if (additionalData.empty() == false) {
+             for (const auto& adata : additionalData) {
+@@ -239,7 +246,7 @@ namespace Plugin {
+                 data += "<" + adata.first + ">"+ adata.second + "</" + adata.first + ">";
+             }
+         }
+-        data += _T("</additionalData></service>");
++        data += _T("\n</additionalData>\n</service>");
+     }
+ 
+     void DIALServer::AppInformation::SetData(const string& data)
+@@ -359,7 +366,7 @@ namespace Plugin {
+         } else {
+             const uint8_t* rawId(Core::SystemInfo::Instance().RawDeviceId());
+             const string deviceId(Core::SystemInfo::Instance().Id(rawId, ~0));
+-
++			string str_port=":80";
+             _dialURL = Core::URL(service->Accessor());
+             _dialURL.Host(selectedNode.HostAddress());
+             _dialPath = '/' + _dialURL.Path().Value();
+@@ -369,7 +376,12 @@ namespace Plugin {
+             //_dialServiceImpl = new DIALServerImpl(deviceId, _dialURL.Text(), _DefaultAppInfoPath);
+ 
+ 			char* ipaddr = const_cast<char*>(selectedNode.HostAddress().c_str());
+-            _dialServiceImpl = new DIALServerImpl(get_local_address(ipaddr), _dialURL.Text(), _DefaultAppInfoPath);
++            string  urlwithoutport = "http://"+selectedNode.HostAddress()+_dialPath;
++            string  urlwithport = "http://"+selectedNode.HostAddress()+str_port+_dialPath;
++			if (urlwithoutport.compare(_dialURL.Text()))
++                _dialServiceImpl = new DIALServerImpl(get_local_address(ipaddr), _dialURL.Text(), _DefaultAppInfoPath);
++			else
++				_dialServiceImpl = new DIALServerImpl(get_local_address(ipaddr), urlwithport, _DefaultAppInfoPath);
+ 
+             ASSERT(_dialServiceImpl != nullptr);
+ 
+@@ -535,7 +547,8 @@ namespace Plugin {
+                     if (request.HasBody() == true) {
+                         if (app.URL(parameters, payload) == true) {
+                             response->Location = _dialServiceImpl->URL() + '/' + app.Name() + '/' + _DefaultControlExtension;
+-                            response->ErrorCode = Web::STATUS_CREATED;
++                            response->ErrorCode = Web::STATUS_OK;
++                            //response->ErrorCode = Web::STATUS_CREATED;
+                             response->Message = _T("Created");
+                         }
+                         else {
+@@ -590,7 +603,7 @@ namespace Plugin {
+ 
+             if (keyword == _DefaultAppInfoDevice) {
+                 if (request.Verb != Web::Request::HTTP_GET) {
+-                    result->ErrorCode = Web::STATUS_BAD_REQUEST;
++                    result->ErrorCode = Web::STATUS_NOT_FOUND;
+                     result->Message = string(_T("The Device Description file can only be retrieved (GET)."));
+                 } else {
+                     TRACE(Trace::Information, (string(_T("Serving the Device Description File"))));
+@@ -627,11 +640,11 @@ namespace Plugin {
+ 
+                     if (options.Exists(kClientFriendyNameQueryKey.c_str(), true) == true) {
+                         if (version.IsValid() == false || (version.IsDefault() == true &&
+-                                                           version < Version{2, 1, 0})) {
++                                                           version < Version{2, 2, 0})) {
+                             // No version was specified but firendlyName was and this
+                             // may only be sent to Server 2.1+
+                             version.Major = 2;
+-                            version.Minor = 1;
++                            version.Minor = 2;
+                             version.Patch = 0;
+                         }
+                     }
+@@ -648,7 +661,7 @@ namespace Plugin {
+                         Core::ProxyType<Web::TextBody> info(_textBodies.Element());
+                         result->ErrorCode = Web::STATUS_OK;
+                         result->Message = _T("OK");
+-                        result->ContentType = Web::MIME_XML;
++                        result->ContentType = Web::MIME_TEXT_XML;
+                         Core::ProxyType<Web::TextBody> textBody(_textBodies.Element());
+                         selectedApp->second.GetData(*textBody, version);
+                         result->Body(textBody);
+@@ -702,7 +715,7 @@ namespace Plugin {
+                         result->Message = _T("OK");
+                         selectedApp->second.Hidding(request.Verb == Web::Request::HTTP_POST);
+                     }    
+-                } else if (index.Current() == _DefaultDataExtension) {
++                } else if ((index.Current() == _DefaultDataExtension)||(index.Current() == _DefaultAddDataExtension)) {
+                     result->ErrorCode = Web::STATUS_OK;
+                     result->Message = _T("OK");
+ 
+@@ -714,10 +727,47 @@ namespace Plugin {
+                     } else if (request.Verb == Web::Request::HTTP_DELETE) {
+                         selectedApp->second.SetData(EMPTY_STRING);
+                     }
++                } else if (index.Current() == _DefaultControlStopExtension)
++                {
++                    result->ErrorCode = Web::STATUS_NOT_FOUND;
++                    result->Message = _T("Unknown request.");
++                    if (request.Verb == Web::Request::HTTP_DELETE) {
++                        StopApplication(request, result, selectedApp->second);
++                        result->ErrorCode = Web::STATUS_OK;
++                    }
++                }
++                else
++                {
++                    result->ErrorCode = Web::STATUS_NOT_FOUND;
++                    result->Message = _T("Unknown request.");
+                 }
+             }
+         }
+-
++		else if (request.Origin.IsSet() == true)
++		{
++			    std::regex youtuberx("(.*)youtube.com(.*)");
++				//std::regex netflixrx("(.*)netflix.com(.*)");
++                std::regex youtuapprx("com.youtube.app");
++				bool bmatchyoutube = std::regex_match(request.Origin.Value().begin(),request.Origin.Value().end(), youtuberx);
++                bmatchyoutube |= std::regex_match(request.Origin.Value().begin(),request.Origin.Value().end(), youtuapprx);
++				//bool bmatchnetflix = std::regex_match(request.Origin.Value().begin(),request.Origin.Value().end(), netflixrx);
++				if (bmatchyoutube)
++				{
++                    static const string _YoutubeApp("YouTube");
++                    auto selectedApp(_appInfo.find(_YoutubeApp));
++                    if (selectedApp == _appInfo.end()) {
++                        result->ErrorCode = Web::STATUS_NOT_FOUND;
++                        result->Message = _T("Requested App Description file [") + _YoutubeApp + _T("] not found.");
++                    } else if (request.Verb == Web::Request::HTTP_POST) {
++                            StartApplication(request, result, selectedApp->second);
++                    }
++				}
++				else
++				{
++					result->ErrorCode = Web::STATUS_FORBIDDEN;
++                    result->Message = string(_T("Unknown request path specified."));
++				}
++		}
+         if (request.Origin.IsSet() == true) {
+             result->AccessControlOrigin = request.Origin.Value();
+         }
+diff --git a/DIALServer/YouTube.cpp b/DIALServer/YouTube.cpp
+index 0505804..bfd9f80 100644
+--- a/DIALServer/YouTube.cpp
++++ b/DIALServer/YouTube.cpp
+@@ -105,6 +105,16 @@ namespace DIALHandlers {
+             {
+                 return _browser != nullptr;
+             }
++            void Stop(const string& params, const string& payload) override
++            {
++                if (_browser != nullptr) {
++                    _browser->Unregister(&_notification);
++                    _browser->Release();
++                    _browser = nullptr;
++                }
++                _hidden = false;
++                Default::Stop(params, payload);
++            }
+             virtual void Stopped(const string& data, const string& payload)
+             {
+                 if (_browser != nullptr) {
+@@ -119,11 +129,13 @@ namespace DIALHandlers {
+             }
+             uint32_t Show() override
+             {
++                _hidden = false;
+                 _browser->Hide(false);
+                 return Core::ERROR_NONE;
+             }
+             void Hide() override
+             {
++                _hidden = true;
+                 _browser->Hide(true);
+             }
+             bool IsHidden() const override

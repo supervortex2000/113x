@@ -1,0 +1,10 @@
+#----------------------------------------------------------#
+#include "arch_a64_7.3.1.config"
+
+#----------------------------------------------------------#
+#include "c2_af400.config"
+###include "flash_nand_4k.config"
+#include "flash_nand_2k.config"
+BR2_PACKAGE_AML_RTOS=n
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesonc2_af400/initramfs/ramfslist-64-ubi-release"
+BR2_LINUX_KERNEL_INTREE_DTS_NAME="meson-c2-c305x-af400-nand"

@@ -1,0 +1,200 @@
+From 65fe9b97f777cdb33d400b4fc3934b28245465a2 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Tue, 29 Dec 2020 16:33:32 +0800
+Subject: [PATCH] ocdm Add GetMetrics
+
+Enable syslog in WPEProcess
+Enable widevine privacy mode
+---
+ Source/WPEProcess/Process.cpp |  3 ++-
+ Source/interfaces/IDRM.h      | 12 ++++++++++++
+ Source/ocdm/IOCDM.h           | 12 ++++++++++++
+ Source/ocdm/open_cdm.cpp      | 37 +++++++++++++++++++++++++++++++++++++
+ Source/ocdm/open_cdm.h        |  9 +++++++++
+ Source/ocdm/open_cdm_impl.h   | 24 ++++++++++++++++++++++++
+ 6 files changed, 96 insertions(+), 1 deletion(-)
+
+diff --git a/Source/WPEProcess/Process.cpp b/Source/WPEProcess/Process.cpp
+index 4fd7e35..715cb9b 100644
+--- a/Source/WPEProcess/Process.cpp
++++ b/Source/WPEProcess/Process.cpp
+@@ -507,6 +507,7 @@ int main(int argc, char** argv)
+     // printf("Continueing, I hope you have attached the debugger\n");
+ 
+     Process::ConsoleOptions options(argc, argv);
++    openlog(argv[0], LOG_PID, LOG_USER);
+ 
+     if ((options.RequestUsage() == true) || (options.Locator == nullptr) || (options.ClassName == nullptr) || (options.RemoteChannel == nullptr) || (options.Exchange == 0)) {
+         printf("Process [-h] \n");
+@@ -590,7 +591,7 @@ int main(int argc, char** argv)
+             }
+         }
+     }
+-
++    closelog();
+     TRACE_L1("End of Process!!!!");
+     return 0;
+ }
+diff --git a/Source/interfaces/IDRM.h b/Source/interfaces/IDRM.h
+index 0eebc0e..e2bdf24 100644
+--- a/Source/interfaces/IDRM.h
++++ b/Source/interfaces/IDRM.h
+@@ -341,10 +341,22 @@ public:
+         uint32_t f_cbServerCertificate)
+         = 0;
+ 
++    // Get Server Certificate Request
++    virtual CDMi_RESULT GetServerCertificateRequest(
++        std::string& message)
++        = 0;
++
++    // Get Server Certificate Request
++    virtual CDMi_RESULT ParseServerCertificateResponse(
++        const std::string& response, std::string& certificate)
++        = 0;
+     // Destroy a MediaKeySession instance.
+     virtual CDMi_RESULT DestroyMediaKeySession(
+         IMediaKeySession* f_piMediaKeySession)
+         = 0;
++
++    // Get metrics
++    virtual CDMi_RESULT GetMetrics(std::string& metrics) = 0;
+ };
+ 
+ // IMediaKeySession defines the MediaKeySessionExt interface.
+diff --git a/Source/ocdm/IOCDM.h b/Source/ocdm/IOCDM.h
+index 61f3fcc..1b1768f 100644
+--- a/Source/ocdm/IOCDM.h
++++ b/Source/ocdm/IOCDM.h
+@@ -192,6 +192,18 @@ struct IAccessorOCDM : virtual public WPEFramework::Core::IUnknown {
+         const uint16_t serverCertificateLength)
+         = 0;
+ 
++    virtual OCDM_RESULT
++    GetServerCertificateRequest(const string& keySystem, std::string& message /* @out */)
++        = 0;
++
++    virtual OCDM_RESULT
++    ParseServerCertificateResponse(const string& keySystem,
++        const std::string& response, std::string& certificate /* @inout */)
++        = 0;
++
++    virtual OCDM_RESULT GetMetrics(const string& keySystem,
++        std::string& metrics /* @out */) const = 0;
++
+     virtual uint64_t GetDrmSystemTime(const std::string& keySystem) const = 0;
+ 
+     virtual std::string GetVersionExt(const std::string& keySystem) const = 0;
+diff --git a/Source/ocdm/open_cdm.cpp b/Source/ocdm/open_cdm.cpp
+index 76db016..9802b44 100644
+--- a/Source/ocdm/open_cdm.cpp
++++ b/Source/ocdm/open_cdm.cpp
+@@ -221,6 +221,43 @@ OpenCDMError opencdm_system_set_server_certificate(struct OpenCDMSystem* system,
+     return (result);
+ }
+ 
++OpenCDMError opencdm_system_get_server_certificate_request(
++    struct OpenCDMSystem* system, std::string& message)
++{
++    OpenCDMAccessor * accessor = OpenCDMAccessor::Instance();
++    OpenCDMError result(ERROR_INVALID_ACCESSOR);
++
++    if (system != nullptr) {
++        result = static_cast<OpenCDMError>(accessor->GetServerCertificateRequest(
++            system->keySystem(), message));
++    }
++    return (result);
++}
++
++OpenCDMError opencdm_system_parse_server_certificate_response(
++    struct OpenCDMSystem* system, const std::string& response, std::string& certificate) {
++    OpenCDMAccessor * accessor = OpenCDMAccessor::Instance();
++    OpenCDMError result(ERROR_INVALID_ACCESSOR);
++
++    if (system != nullptr) {
++        result = static_cast<OpenCDMError>(accessor->ParseServerCertificateResponse(
++            system->keySystem(), response, certificate));
++    }
++    return (result);
++}
++
++OpenCDMError opencdm_get_metrics(struct OpenCDMSystem* system,
++    std::string& metrics) {
++    OpenCDMAccessor * accessor = OpenCDMAccessor::Instance();
++    OpenCDMError result(ERROR_INVALID_ACCESSOR);
++
++    if (system != nullptr) {
++        result = static_cast<OpenCDMError>(accessor->GetMetrics(
++            system->keySystem(), metrics));
++    }
++    return (result);
++}
++
+ /**
+  * Destructs an \ref OpenCDMSession instance.
+  * \param system \ref OpenCDMSession instance to desctruct.
+diff --git a/Source/ocdm/open_cdm.h b/Source/ocdm/open_cdm.h
+index 4acfd6a..6a47ea3 100644
+--- a/Source/ocdm/open_cdm.h
++++ b/Source/ocdm/open_cdm.h
+@@ -59,6 +59,7 @@
+ 
+ #include <stdio.h>
+ #include <list>
++#include <string>
+ 
+ #ifndef EXTERNAL
+ #ifdef _MSVC_LANG
+@@ -322,6 +323,14 @@ EXTERNAL OpenCDMError opencdm_system_set_server_certificate(
+     struct OpenCDMSystem* system,
+     const uint8_t serverCertificate[], const uint16_t serverCertificateLength);
+ 
++EXTERNAL OpenCDMError opencdm_system_get_server_certificate_request(
++    struct OpenCDMSystem* system, std::string& message);
++
++EXTERNAL OpenCDMError opencdm_system_parse_server_certificate_response(
++    struct OpenCDMSystem* system, const std::string& response, std::string& certificate);
++
++OpenCDMError opencdm_get_metrics(struct OpenCDMSystem* system,
++    std::string& metrics);
+ /**
+  * \brief Create DRM session (for actual decrypting of data).
+  *
+diff --git a/Source/ocdm/open_cdm_impl.h b/Source/ocdm/open_cdm_impl.h
+index 69d7ca6..4228549 100644
+--- a/Source/ocdm/open_cdm_impl.h
++++ b/Source/ocdm/open_cdm_impl.h
+@@ -195,6 +195,30 @@ public:
+             serverCertificateLength));
+     }
+ 
++    // Get Server Certificate Request
++    virtual OCDM::OCDM_RESULT
++    GetServerCertificateRequest(const string& keySystem, std::string& message) override
++    {
++        return (_remote->GetServerCertificateRequest(keySystem, message));
++    }
++
++    // Parse and Load Server Certificate Response
++    virtual OCDM::OCDM_RESULT
++    ParseServerCertificateResponse(const string& keySystem,
++        const std::string& response, std::string& certificate) override
++    {
++        return (_remote->ParseServerCertificateResponse(keySystem,
++              response, certificate));
++    }
++
++    // Get Metrics
++    virtual OCDM::OCDM_RESULT
++    GetMetrics(const std::string& keySystem, std::string& metrics) const override
++    {
++        ASSERT(_remote && "This method only works on IAccessorOCDM implementations.");
++        return (_remote->GetMetrics(keySystem, metrics));
++    }
++
+     OpenCDMSession* Session(const std::string& sessionId);
+ 
+     void AddSession(OpenCDMSession* sessionId);
+-- 
+2.7.4
+

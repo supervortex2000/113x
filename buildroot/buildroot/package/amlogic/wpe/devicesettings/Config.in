@@ -1,0 +1,7 @@
+menuconfig BR2_PACKAGE_DEVICESETTINGS
+	bool "devicesettings"
+	select BR2_PACKAGE_DEVICESETTINGS_HAL_LLAMA
+	select BR2_PACKAGE_IARMBUS
+	help
+	   rdk devicesettings.
+

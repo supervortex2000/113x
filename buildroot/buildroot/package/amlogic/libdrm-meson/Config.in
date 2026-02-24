@@ -1,0 +1,5 @@
+config BR2_PACKAGE_LIBDRM_MESON
+        bool "libdrm_meson"
+	select BR2_PACKAGE_LIBDRM
+        help
+          libdrm_meson library, provide alloc buf and post buf api.

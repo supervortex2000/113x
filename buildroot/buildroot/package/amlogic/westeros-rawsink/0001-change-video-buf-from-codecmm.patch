@@ -1,0 +1,44 @@
+From 37e667d7aa3e01a2d3f9547be1c980294f9ed247 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Fri, 2 Apr 2021 10:43:30 +0800
+Subject: [PATCH 1/2] change video buf from codecmm
+
+Change-Id: If5d91b18cb0dd8e8fff8c4b0c079ec9a70af4127
+---
+ westeros-sink/raw/westeros-sink-soc.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/westeros-sink/raw/westeros-sink-soc.c b/westeros-sink/raw/westeros-sink-soc.c
+index 1f5fe32..4e7bb3c 100644
+--- a/westeros-sink/raw/westeros-sink-soc.c
++++ b/westeros-sink/raw/westeros-sink-soc.c
+@@ -40,6 +40,10 @@
+ #include <gst/allocators/gstdmabuf.h>
+ #endif
+ 
++#ifdef USE_AMLOGIC_MESON
++#include "meson_drm.h"
++#endif
++
+ #include "westeros-sink.h"
+ 
+ #define DEFAULT_VIDEO_SERVER "video"
+@@ -2665,6 +2669,7 @@ static bool drmAllocBuffer( GstWesterosSink *sink, int buffIndex, int width, int
+       createDumb.width= width;
+       createDumb.height= height;
+       createDumb.bpp= 8;
++      createDumb.flags = MESON_USE_VIDEO_PLANE;
+       rc= ioctl( sink->soc.drmFd, DRM_IOCTL_MODE_CREATE_DUMB, &createDumb );
+       if ( rc )
+       {
+@@ -2695,6 +2700,7 @@ static bool drmAllocBuffer( GstWesterosSink *sink, int buffIndex, int width, int
+       createDumb.width= width;
+       createDumb.height= height/2;
+       createDumb.bpp= 8;
++      createDumb.flags = MESON_USE_VIDEO_PLANE;
+       rc= ioctl( sink->soc.drmFd, DRM_IOCTL_MODE_CREATE_DUMB, &createDumb );
+       if ( rc )
+       {
+-- 
+2.31.0
+

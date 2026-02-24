@@ -1,0 +1,38 @@
+RAMDISK_MODULES_LOAD_LIST=(
+	amlogic-gkitool
+	amlogic-secmon
+	amlogic-clk
+	amlogic-gpiolib
+	amlogic-pinctrl
+	amlogic-irqchip
+	amlogic-mailbox
+	amlogic-power
+	amlogic-cpuinfo
+	amlogic-reset
+	amlogic-efuse-unifykey
+	amlogic-spi
+	amlogic-mtd-common
+	spinand
+	amlogic-i2c
+)
+
+VENDOR_MODULES_LOAD_FIRST_LIST=(
+	amlogic-pwm
+	pwm-regulator
+	amlogic-cpufreq
+	amlogic-mmc
+	amlogic-rng
+	amlogic-crypto-dma
+	amlogic-tee
+)
+
+VENDOR_MODULES_LOAD_LAST_LIST=(
+	dwc3
+	dwc_otg
+)
+
+MODULES_LOAD_BLACK_LIST=(
+	${VENDOR_MODULES_LOAD_BLACK_LIST[@]}
+	${OEM_MODULES_LOAD_BLACK_LIST[@]}
+)
+

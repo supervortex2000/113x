@@ -1,0 +1,6 @@
+config BR2_PACKAGE_IPC_RTSP_SERVER
+	bool "ipc rtsp server"
+	select BR2_PACKAGE_IPC_SDK
+	help
+	  ipc rtsp server library
+

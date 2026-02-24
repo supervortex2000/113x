@@ -1,0 +1,6 @@
+config BR2_PACKAGE_AML_BT_CT
+	bool "aml bt conduction test tool"
+	depends on BR2_PACKAGE_AML_BT
+	default y
+	help
+	aml bt conduction test tool

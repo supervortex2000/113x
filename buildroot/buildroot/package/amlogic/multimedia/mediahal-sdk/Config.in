@@ -1,0 +1,33 @@
+menuconfig BR2_PACKAGE_MEDIAHAL_SDK
+	bool "mediahal_sdk"
+	help
+	    amlogic mediahal_sdk library.
+	    http://openlinux.amlogic.com
+
+if BR2_PACKAGE_MEDIAHAL_SDK
+
+config BR2_PACKAGE_MEDIAHAL_SDK_RESMAN
+	bool "resman"
+	help
+	  resource manager
+
+config BR2_PACKAGE_MEDIAHAL_SDK_VIDEODEC
+	bool "videodec"
+	select BR2_PACKAGE_LIBEVENT
+	help
+	  videodec
+
+config BR2_PACKAGE_MEDIAHAL_SDK_MEDIASYNC
+	bool "mediasync"
+	help
+	  mediasync
+
+config BR2_PACKAGE_MEDIAHAL_SDK_TSPLAYER
+	bool "tsplayer"
+	select BR2_PACKAGE_MEDIAHAL_SDK_RESMAN
+	select BR2_PACKAGE_MEDIAHAL_SDK_VIDEODEC
+	select BR2_PACKAGE_MEDIAHAL_SDK_MEDIASYNC
+	help
+	  tsplayer
+
+endif

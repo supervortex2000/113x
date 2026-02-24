@@ -1,0 +1,1265 @@
+Index: git/HostImplementation.h
+===================================================================
+--- git.orig/HostImplementation.h
++++ git/HostImplementation.h
+@@ -2,7 +2,6 @@
+ #define WIDEVINE_HOST_IMPLEMENTATION_H
+ 
+ #include "cdm.h"
+-#include "override.h"
+ 
+ #include <core/core.h>
+ 
+@@ -69,21 +68,21 @@ public:
+  
+   // widevine::Cdm::IStorage implementation
+   // ---------------------------------------------------------------------------
+-  virtual bool read(const std::string& name, std::string* data) OVERRIDE;
+-  virtual bool write(const std::string& name, const std::string& data) OVERRIDE;
+-  virtual bool exists(const std::string& name) OVERRIDE;
+-  virtual bool remove(const std::string& name) OVERRIDE;
+-  virtual int32_t size(const std::string& name) OVERRIDE;
+-  virtual bool list(std::vector<std::string>* names) OVERRIDE;
++  virtual bool read(const std::string& name, std::string* data) override;
++  virtual bool write(const std::string& name, const std::string& data) override;
++  virtual bool exists(const std::string& name) override;
++  virtual bool remove(const std::string& name) override;
++  virtual int32_t size(const std::string& name) override;
++  virtual bool list(std::vector<std::string>* names) override;
+ 
+   // widevine::Cdm::IClock implementation
+   // ---------------------------------------------------------------------------
+-  virtual int64_t now() OVERRIDE;
++  virtual int64_t now() override;
+ 
+   // widevine::Cdm::ITimer implementation
+   // ---------------------------------------------------------------------------
+-  virtual void setTimeout(int64_t delay_ms, IClient* client, void* context) OVERRIDE;
+-  virtual void cancel(IClient* client) OVERRIDE;
++  virtual void setTimeout(int64_t delay_ms, IClient* client, void* context) override;
++  virtual void cancel(IClient* client) override;
+ 
+ private:
+   bool _saveDeviceCert;
+Index: git/MediaSession.cpp
+===================================================================
+--- git.orig/MediaSession.cpp
++++ git/MediaSession.cpp
+@@ -37,6 +37,26 @@ namespace CDMi {
+ 
+ WPEFramework::Core::CriticalSection g_lock;
+ 
++void IncrementIv(uint8_t* iv, size_t block_count) {
++  if (0 == block_count)
++    return;
++  uint8_t carry = 0;
++  uint8_t n = static_cast<uint8_t>(16 - 1);
++
++  while (n >= 8) {
++    uint32_t temp = block_count & 0xff;
++    temp += iv[n];
++    temp += carry;
++    iv[n] = temp & 0xff;
++    carry = (temp & 0x100) ? 1 : 0;
++    block_count = block_count >> 8;
++    n--;
++    if (0 == block_count && !carry) {
++      break;
++    }
++  }
++}
++
+ MediaKeySession::MediaKeySession(widevine::Cdm *cdm, int32_t licenseType)
+     : m_cdm(cdm)
+     , m_CDMData("")
+@@ -315,24 +335,123 @@ CDMi_RESULT MediaKeySession::Decrypt(
+ 
+     // FIXME: We just check the first key? How do we know that's the Widevine key and not, say, a PlayReady one?
+     if (widevine::Cdm::kUsable == it->second) {
+-      widevine::Cdm::OutputBuffer output;
+-      uint8_t *outputBuffer = (uint8_t*) malloc(f_cbData * sizeof(uint8_t));
+-      output.data = outputBuffer;
+-      output.data_length = f_cbData;
+-      widevine::Cdm::InputBuffer input;
+-      input.data = f_pbData;
+-      input.data_length = f_cbData;
+-      input.key_id = reinterpret_cast<const uint8_t*>((it->first).c_str());
+-      input.key_id_length = (it->first).size();
+-      input.iv = m_IV;
+-      input.iv_length = sizeof(m_IV);
+-
+-      if (widevine::Cdm::kSuccess == m_cdm->decrypt(input, output)) {
+-        /* Return clear content */
+-        *f_pcbOpaqueClearContent = output.data_length;
+-        *f_ppbOpaqueClearContent = outputBuffer;
+-        
++      uint32_t magic;
++      memcpy(&magic, f_pbData, sizeof(magic));
++      if (magic == 0x5ec00ce5) {
++        uint32_t secureHandle = 0;
++        uint32_t subSampleCount = 0;
++        uint8_t *pbData = const_cast<uint8_t*>(f_pbData);
++        uint32_t cbEncrypted;
++        uint8_t *pbDataItr = pbData + sizeof(magic);
++        uint8_t *pbEncrypted;
++        uint16_t inClear = 0;
++        uint32_t inEncrypted = 0;
++        size_t blockCounter = 0;
++        size_t encryptedOffset = 0;
++        uint8_t *outputBuffer;
++
++        memcpy(&secureHandle, pbDataItr, sizeof(secureHandle));
++        pbDataItr += sizeof(secureHandle);
++        memcpy(&subSampleCount, pbDataItr, sizeof(subSampleCount));
++        pbDataItr += sizeof(subSampleCount);
++
++        pbEncrypted = pbDataItr
++            + subSampleCount * (sizeof(inClear) + sizeof(inEncrypted));
++        cbEncrypted = f_cbData - sizeof(secureHandle) - sizeof(subSampleCount)
++            - subSampleCount * (sizeof(inClear) + sizeof(inEncrypted));
++        widevine::Cdm::OutputBuffer output;
++        widevine::Cdm::InputBuffer input;
++
++
++        input.data = pbEncrypted;
++        input.data_length = cbEncrypted;
++        input.key_id = reinterpret_cast<const uint8_t*>((it->first).c_str());
++        input.block_offset = 0;
++        input.key_id_length = (it->first).size();
++        input.iv = m_IV;
++        input.iv_length = sizeof(m_IV);
++        input.is_video = true;
++
++        if (secureHandle) {
++          output.data = reinterpret_cast<uint8_t*>(secureHandle);
++          output.is_secure = true;
++        } else {
++          outputBuffer = (uint8_t*) malloc(cbEncrypted * sizeof(uint8_t));
++          output.data = outputBuffer;
++          output.data_offset = 0;
++          output.is_secure = false;
++        }
++        output.data_length = cbEncrypted;
++
++
++        for (int i = 0; i < subSampleCount; i++) {
++          memcpy(&inClear, pbDataItr, sizeof(inClear));
++          pbDataItr += sizeof(inClear);
++          memcpy(&inEncrypted, pbDataItr, sizeof(inEncrypted));
++          pbDataItr += sizeof(inEncrypted);
++          if (inClear > 0) {
++            input.last_subsample = i + 1 == subSampleCount && inEncrypted == 0;
++            input.encryption_scheme = widevine::Cdm::EncryptionScheme::kClear;
++            input.data_length = inClear;
++            if (widevine::Cdm::kSuccess != m_cdm->decrypt(input, output)) {
++              break;
++            }
++            output.data_offset += inClear;
++            input.data += inClear;
++            input.first_subsample = false;
++          }
++
++          if (inEncrypted > 0) {
++            input.last_subsample = i + 1 == subSampleCount;
++            input.encryption_scheme = widevine::Cdm::EncryptionScheme::kAesCtr;
++            input.data_length = inEncrypted;
++            if (widevine::Cdm::kSuccess != m_cdm->decrypt(input, output)) {
++              break;
++            }
++            output.data_offset += inEncrypted;
++            input.data += inEncrypted;
++            input.block_offset += inEncrypted;
++            input.block_offset %= 16;
++
++            encryptedOffset += inEncrypted;
++
++            if (input.encryption_scheme
++                == widevine::Cdm::EncryptionScheme::kAesCtr) {
++              size_t new_block_counter = encryptedOffset / 16;
++              IncrementIv(m_IV, new_block_counter - blockCounter);
++              blockCounter = new_block_counter;
++            }
++            input.first_subsample = false;
++          }
++        }
++        if (secureHandle) {
++          *f_pcbOpaqueClearContent = 0;
++          *f_ppbOpaqueClearContent = pbData;
++        } else {
++          *f_pcbOpaqueClearContent = cbEncrypted;
++          *f_ppbOpaqueClearContent = outputBuffer;
++        }
+         status = CDMi_SUCCESS;
++      } else {
++        widevine::Cdm::OutputBuffer output;
++        uint8_t *outputBuffer = (uint8_t*) malloc(f_cbData * sizeof(uint8_t));
++        output.data = outputBuffer;
++        output.data_length = f_cbData;
++        widevine::Cdm::InputBuffer input;
++        input.data = f_pbData;
++        input.data_length = f_cbData;
++        input.key_id = reinterpret_cast<const uint8_t*>((it->first).c_str());
++        input.key_id_length = (it->first).size();
++        input.iv = m_IV;
++        input.iv_length = sizeof(m_IV);
++
++        if (widevine::Cdm::kSuccess == m_cdm->decrypt(input, output)) {
++          /* Return clear content */
++          *f_pcbOpaqueClearContent = output.data_length;
++          *f_ppbOpaqueClearContent = outputBuffer;
++
++          status = CDMi_SUCCESS;
++        }
+       }
+     }
+   }
+Index: git/MediaSystem.cpp
+===================================================================
+--- git.orig/MediaSystem.cpp
++++ git/MediaSystem.cpp
+@@ -22,9 +22,57 @@
+ #include <iostream>
+ #include <sstream>
+ #include <sys/utsname.h>
++#include "UrlRequest.h"
++#include "LicenseRequest.h"
+ 
+ namespace CDMi {
+ 
++bool Fetch(const std::string& url,
++         const std::string& message,
++         std::string* response,
++         int* status_code) {
++    UrlRequest url_request(url);
++    if (!url_request.is_connected()) {
++      return false;
++    }
++    url_request.PostRequest(message);
++    std::string http_response;
++    url_request.GetResponse(&http_response);
++    // Some license servers return 400 for invalid message, some
++    // return 500; treat anything other than 200 as an invalid message.
++    int http_status_code = url_request.GetStatusCode(http_response);
++    if (status_code) {
++      *status_code = http_status_code;
++    }
++
++    if (response) {
++      if (http_status_code == 200 ) {
++        // Parse out HTTP and server headers and return the body only.
++        std::string reply_body;
++        LicenseRequest lic_request;
++        lic_request.GetDrmMessage(http_response, reply_body);
++        *response = reply_body;
++      } else {
++        *response = http_response;
++      }
++    //printf("Reply body: %s", b2a_hex(*response).c_str());
++    }
++    return true;
++}
++
++bool GetProvisioningResponse(const std::string& message, std::string& respose)
++{
++    bool fetch_flag = false;
++    int status_code;
++
++    //std::cout <<" GetProvisioning : " <<  message << std::endl;
++    std::string url = "https://www.googleapis.com/certificateprovisioning/v1/devicecertificates/create"
++            "?key=AIzaSyB-5OLKTx2iU5mko18DfdwK5611JIjbUhE&signedRequest=";
++    url.append(message.c_str());
++    fetch_flag = Fetch(url, "", &respose, &status_code);
++    return fetch_flag;
++}
++
+ class WideVine : public IMediaKeys, public widevine::Cdm::IEventListener
+ {
+ private:
+@@ -47,7 +95,8 @@ public:
+         client_info.company_name = "www.metrological.com";
+         client_info.model_name = "www";
+ 
+-    #if defined(__linux__)
++
++#if defined(__linux__)
+         client_info.device_name = "Linux";
+         {
+             struct utsname name;
+@@ -63,11 +112,19 @@ public:
+         // widevine::Cdm::DeviceCertificateRequest cert_request;
+ 
+         if (widevine::Cdm::kSuccess == widevine::Cdm::initialize(
+-                widevine::Cdm::kNoSecureOutput, client_info, &_host, &_host, &_host, static_cast<widevine::Cdm::LogLevel>(0))) {
++                widevine::Cdm::kOpaqueHandle, client_info, &_host, &_host, &_host, static_cast<widevine::Cdm::LogLevel>(0))) {
+ 	    // Setting the last parameter to true, requres serviceCertificates so the requests can be encrypted. Currently badly supported
+             // in the EME tests, so turn of for now :-)
+             _cdm = widevine::Cdm::create(this, &_host, false);
+         }
++        if (_cdm /* && !_cdm->isProvisioned()*/) {
++            std::string message;
++            std::string response;
++            _cdm->getProvisioningRequest(&message);
++            if (GetProvisioningResponse(message, response) == true) {
++                _cdm->handleProvisioningResponse(response);
++            }
++        }
+     }
+     virtual ~WideVine() {
+         _adminLock.Lock();
+@@ -130,7 +187,7 @@ public:
+         CDMi_RESULT dr = CDMi_S_FALSE;
+ 
+         std::string serverCertificate(reinterpret_cast<const char*>(f_pbServerCertificate), f_cbServerCertificate);
+-        if (widevine::Cdm::kSuccess == _cdm->setServiceCertificate(serverCertificate)) {
++        if (widevine::Cdm::kSuccess == _cdm->setServiceCertificate(widevine::Cdm::kAllServices, serverCertificate)) {
+             dr = CDMi_SUCCESS;
+         }
+         return dr;
+@@ -169,7 +226,7 @@ public:
+         _adminLock.Unlock();
+     }
+ 
+-    virtual void onKeyStatusesChange(const std::string& session_id) {
++    virtual void onKeyStatusesChange(const std::string& session_id, bool has_new_usable_key) {
+ 
+         _adminLock.Lock();
+ 
+Index: git/cmake/FindWideVine.cmake
+===================================================================
+--- git.orig/cmake/FindWideVine.cmake
++++ git/cmake/FindWideVine.cmake
+@@ -29,7 +29,7 @@
+ # ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
+ #
+ 
+-find_path (WIDEVINE_INCLUDE_DIRS NAME wv_cdm_types.h PATHS "usr/include/" PATH_SUFFIXES "openssl")
++find_path (WIDEVINE_INCLUDE_DIRS NAME cdm.h PATHS "usr/include/" PATH_SUFFIXES "openssl")
+ 
+ find_library(WIDEVINE_LIBRARIES NAME widevine_ce_cdm_shared PATH_SUFFIXES lib)
+ 
+Index: git/HttpSocket.cpp
+===================================================================
+--- /dev/null
++++ git/HttpSocket.cpp
+@@ -0,0 +1,472 @@
++// Copyright 2018 Google LLC. All Rights Reserved. This file and proprietary
++// source code may only be used and distributed under the Widevine Master
++// License Agreement.
++
++
++#include <cstring>
++#include <errno.h>
++#include <fcntl.h>
++#include <stdlib.h>
++#include <string.h>
++#include "HttpSocket.h"
++
++#ifdef _WIN32
++# include "winsock2.h"
++# include "ws2tcpip.h"
++# define ERROR_ASYNC_COMPLETE WSAEWOULDBLOCK
++#else
++# include <netdb.h>
++# include <netinet/in.h>
++# include <sys/socket.h>
++# include <unistd.h>
++# define ERROR_ASYNC_COMPLETE EINPROGRESS
++#endif
++
++#include <openssl/bio.h>
++#include <openssl/err.h>
++#include <openssl/x509.h>
++
++#include "Platform.h"
++
++namespace CDMi {
++
++namespace {
++
++// Helper function to tokenize a string.  This makes it easier to avoid silly
++// parsing bugs that creep in easily when each part of the string is parsed
++// with its own piece of code.
++bool Tokenize(const std::string& source, const std::string& delim,
++              const size_t offset, std::string* substring_output,
++              size_t* next_offset) {
++  size_t start_of_delim = source.find(delim, offset);
++  if (start_of_delim == std::string::npos) {
++    return false;
++  }
++  substring_output->assign(source, offset, start_of_delim - offset);
++  *next_offset = start_of_delim + delim.size();
++  return true;
++}
++
++SSL_CTX* InitSslContext() {
++  OpenSSL_add_all_algorithms();
++  SSL_load_error_strings();
++  const SSL_METHOD* method = TLSv1_2_client_method();
++  SSL_CTX* ctx = SSL_CTX_new(method);
++  if (!ctx) printf("failed to create SSL context\n");
++  int ret = SSL_CTX_set_cipher_list(
++      ctx, "ALL:!RC4-MD5:!RC4-SHA:!ECDHE-ECDSA-RC4-SHA:!ECDHE-RSA-RC4-SHA");
++  if (0 == ret) printf("error disabling vulnerable ciphers\n");
++  return ctx;
++}
++
++static int LogBoringSslError(
++    const char* message, size_t length, void* /* user_data */) {
++  printf("  BoringSSL Error: %s\n", message);
++  return length;
++}
++
++bool IsRetryableSslError(int ssl_error) {
++  return ssl_error != SSL_ERROR_ZERO_RETURN &&
++      ssl_error != SSL_ERROR_SYSCALL &&
++      ssl_error != SSL_ERROR_SSL;
++}
++
++#if 0
++// unused, may be useful for debugging SSL-related issues.
++void ShowServerCertificate(const SSL* ssl) {
++  // gets the server certificate
++  X509* cert = SSL_get_peer_certificate(ssl);
++  if (cert) {
++    char* line = X509_NAME_oneline(X509_get_subject_name(cert), 0, 0);
++    LOGV("server certificate:");
++    LOGV("subject: %s", line);
++    free(line);
++    line = X509_NAME_oneline(X509_get_issuer_name(cert), 0, 0);
++    LOGV("issuer: %s", line);
++    free(line);
++    X509_free(cert);
++  } else {
++    printf("Failed to get server certificate\n");
++  }
++}
++#endif
++
++// Wait for a socket to be ready for reading or writing.
++// Establishing a connection counts as "ready for write".
++// Returns false on select error or timeout.
++// Returns true when the socket is ready.
++bool SocketWait(int fd, bool for_read, int timeout_in_ms) {
++  fd_set fds;
++  FD_ZERO(&fds);
++  FD_SET(fd, &fds);
++
++  struct timeval tv;
++  tv.tv_sec = timeout_in_ms / 1000;
++  tv.tv_usec = (timeout_in_ms % 1000) * 1000;
++
++  fd_set* read_fds = NULL;
++  fd_set* write_fds = NULL;
++  if (for_read) {
++    read_fds = &fds;
++  } else {
++    write_fds = &fds;
++  }
++
++  int ret = select(fd + 1, read_fds, write_fds, NULL, &tv);
++  if (ret == 0) {
++    printf("socket timed out\n");
++    return false;
++  } else if (ret == -1) {
++    printf("select failed, errno = %d\n", errno);
++    return false;
++  }
++
++  // socket ready.
++  return true;
++}
++
++int GetError() {
++#ifdef _WIN32
++  return WSAGetLastError();
++#else
++  return errno;
++#endif
++}
++
++void ClearError() {
++#ifdef _WIN32
++  WSASetLastError(0);
++#else
++  errno = 0;
++#endif
++}
++
++const char* GetErrorString() {
++#ifdef _WIN32
++  static char buffer[2048];
++  const int flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
++  const int code = WSAGetLastError();
++  if (!FormatMessage(flags, nullptr, code, 0, buffer, sizeof(buffer), nullptr))
++    return "Unknown error";
++  return buffer;
++#else
++  return strerror(errno);
++#endif
++}
++
++}  // namespace
++
++// Parses the URL and extracts all relevant information.
++// static
++bool HttpSocket::ParseUrl(const std::string& url, std::string* scheme,
++                          bool* secure_connect, std::string* domain_name,
++                          std::string* port, std::string* path) {
++  size_t offset = 0;
++
++  if (!Tokenize(url, "://", offset, scheme, &offset)) {
++    printf("Invalid URL, scheme not found: %s\n", url.c_str());
++    return false;
++  }
++
++  // If the scheme is http or https, set secure_connect and port accordingly.
++  // Otherwise, consider the scheme unsupported and fail.
++  if (*scheme == "http") {
++    *secure_connect = false;
++    port->assign("80");
++  } else if (*scheme == "https") {
++    *secure_connect = true;
++    port->assign("443");
++  } else {
++    printf("Invalid URL, scheme not supported: %s\n", url.c_str());
++    return false;
++  }
++
++  if (!Tokenize(url, "/", offset, domain_name, &offset)) {
++    // The rest of the URL belongs to the domain name.
++    domain_name->assign(url, offset, std::string::npos);
++    // No explicit path after the domain name.
++    path->assign("/");
++  } else {
++    // The rest of the URL, including the preceding slash, belongs to the path.
++    path->assign(url, offset - 1, std::string::npos);
++  }
++
++  // The domain name may optionally contain a port which overrides the default.
++  std::string domain_name_without_port;
++  size_t port_offset;
++  if (Tokenize(*domain_name, ":", 0, &domain_name_without_port, &port_offset)) {
++    port->assign(domain_name->c_str() + port_offset);
++    int port_num = atoi(port->c_str());
++    if (port_num <= 0 || port_num >= 65536) {
++      printf("Invalid URL, port not valid: %s\n", url.c_str());
++      return false;
++    }
++    domain_name->assign(domain_name_without_port);
++  }
++
++  return true;
++}
++
++HttpSocket::HttpSocket(const std::string& url)
++    : socket_fd_(-1), ssl_(NULL), ssl_ctx_(NULL) {
++  valid_url_ = ParseUrl(url, &scheme_, &secure_connect_, &domain_name_, &port_,
++                        &resource_path_);
++  SSL_library_init();
++}
++
++HttpSocket::~HttpSocket() { CloseSocket(); }
++
++void HttpSocket::CloseSocket() {
++  if (socket_fd_ != -1) {
++#ifdef _WIN32
++    closesocket(socket_fd_);
++#else
++    close(socket_fd_);
++#endif
++    socket_fd_ = -1;
++  }
++  if (ssl_) {
++    SSL_free(ssl_);
++    ssl_ = NULL;
++  }
++  if (ssl_ctx_) {
++    SSL_CTX_free(ssl_ctx_);
++    ssl_ctx_ = NULL;
++  }
++}
++
++bool HttpSocket::Connect(int timeout_in_ms) {
++  if (!valid_url_) {
++    return false;
++  }
++
++#ifdef _WIN32
++  static bool initialized = false;
++  if (!initialized) {
++    WSADATA ignored_data;
++    int err = WSAStartup(MAKEWORD(2, 2), &ignored_data);
++    if (err != 0) {
++      printf("Error in WSAStartup: %d\n", err);
++      return false;
++    }
++    initialized = true;
++  }
++#endif
++
++  // lookup the server IP
++  struct addrinfo hints;
++  memset(&hints, 0, sizeof(hints));
++  hints.ai_family = AF_UNSPEC;
++  hints.ai_socktype = SOCK_STREAM;
++  hints.ai_flags = AI_NUMERICSERV | AI_ADDRCONFIG;
++
++  struct addrinfo* addr_info = NULL;
++  int ret = getaddrinfo(domain_name_.c_str(), port_.c_str(), &hints,
++                        &addr_info);
++  if (ret != 0) {
++    printf("getaddrinfo failed, errno = %d\n", ret);
++    return false;
++  }
++
++  // get a socket
++  socket_fd_ = socket(addr_info->ai_family, addr_info->ai_socktype,
++                      addr_info->ai_protocol);
++  if (socket_fd_ < 0) {
++    printf("cannot open socket, errno = %d\n", GetError());
++    return false;
++  }
++
++  // set the socket in non-blocking mode
++#ifdef _WIN32
++  u_long mode = 1;  // Non-blocking mode.
++  if (ioctlsocket(socket_fd_, FIONBIO, &mode) != 0) {
++    printf("ioctlsocket error, wsa error = %d\n", WSAGetLastError());
++    CloseSocket();
++    return false;
++  }
++#else
++  int original_flags = fcntl(socket_fd_, F_GETFL, 0);
++  if (original_flags == -1) {
++    printf("fcntl error, errno = %d\n", errno);
++    CloseSocket();
++    return false;
++  }
++  if (fcntl(socket_fd_, F_SETFL, original_flags | O_NONBLOCK) == -1) {
++    printf("fcntl error, errno = %d\n", errno);
++    CloseSocket();
++    return false;
++  }
++#endif
++
++  // connect to the server
++  ret = connect(socket_fd_, addr_info->ai_addr, addr_info->ai_addrlen);
++  freeaddrinfo(addr_info);
++
++  if (ret == 0) {
++    // connected right away.
++  } else {
++    if (GetError() != ERROR_ASYNC_COMPLETE) {
++      // failed right away.
++      printf("cannot connect to %s, errno = %d\n", domain_name_.c_str(), GetError());
++      CloseSocket();
++      return false;
++    } else {
++      // in progress.  block until timeout expired or connection established.
++      if (!SocketWait(socket_fd_, /* for_read */ false, timeout_in_ms)) {
++        printf("cannot connect to %s\n", domain_name_.c_str());
++        CloseSocket();
++        return false;
++      }
++    }
++  }
++
++  // set up SSL if needed
++  if (secure_connect_) {
++    ssl_ctx_ = InitSslContext();
++    if (!ssl_ctx_) {
++      CloseSocket();
++      return false;
++    }
++
++    ssl_ = SSL_new(ssl_ctx_);
++    if (!ssl_) {
++      printf("failed SSL_new\n");
++      CloseSocket();
++      return false;
++    }
++
++    BIO* a_bio = BIO_new_socket(socket_fd_, BIO_NOCLOSE);
++    if (!a_bio) {
++      printf("BIO_new_socket error\n");
++      CloseSocket();
++      return false;
++    }
++
++    SSL_set_bio(ssl_, a_bio, a_bio);
++    do {
++      ret = SSL_connect(ssl_);
++      if (ret != 1) {
++        int ssl_err = SSL_get_error(ssl_, ret);
++        if (ssl_err != SSL_ERROR_WANT_READ && ssl_err != SSL_ERROR_WANT_WRITE) {
++          char buf[256];
++          printf("SSL_connect error: %s\n", ERR_error_string(ERR_get_error(), buf));
++          CloseSocket();
++          return false;
++        }
++        bool for_read = ssl_err == SSL_ERROR_WANT_READ;
++        if (!SocketWait(socket_fd_, for_read, timeout_in_ms)) {
++          printf("cannot connect to %s\n", domain_name_.c_str());
++          CloseSocket();
++          return false;
++        }
++      }
++    } while (ret != 1);
++  }
++
++  return true;
++}
++
++// Returns -1 for error, number of bytes read for success.
++// The timeout here only applies to the span between packets of data, for the
++// sake of simplicity.
++int HttpSocket::Read(char* data, int len, int timeout_in_ms) {
++  int total_read = 0;
++  int to_read = len;
++
++  if (socket_fd_ == -1) {
++    printf("Socket to %s not open.  Cannot read.\n", domain_name_.c_str());
++    return -1;
++  }
++  while (to_read > 0) {
++    if (!SocketWait(socket_fd_, /* for_read */ true, timeout_in_ms)) {
++      printf("unable to read from %s\n", domain_name_.c_str());
++      return -1;
++    }
++
++    ClearError();  // Reset errors, as we will depend on its value shortly.
++    int read;
++    if (secure_connect_) {
++      read = SSL_read(ssl_, data, to_read);
++    } else {
++      read = recv(socket_fd_, data, to_read, 0);
++    }
++
++    if (read > 0) {
++      to_read -= read;
++      data += read;
++      total_read += read;
++    } else if (secure_connect_) {
++      // Secure read error
++      int ssl_error = SSL_get_error(ssl_, read);
++
++      if (ssl_error == SSL_ERROR_ZERO_RETURN ||
++          (ssl_error == SSL_ERROR_SYSCALL && GetError() == 0)) {
++        // The connection has been closed.  No more data.
++        break;
++      } else if (IsRetryableSslError(ssl_error)) {
++        sleep(1);
++        // After sleeping, fall through to iterate the loop again and retry.
++      } else {
++        // Unrecoverable error. Log and abort.
++        printf("SSL_read returned %d, LibSSL Error = %d\n", read, ssl_error);
++        if (ssl_error == SSL_ERROR_SYSCALL) {
++          printf("  errno = %d = %s\n", GetError(), GetErrorString());
++        }
++        ERR_print_errors_cb(LogBoringSslError, NULL);
++        return -1;
++      }
++    } else {
++      // Non-secure read error
++      if (read == 0) {
++        // The connection has been closed.  No more data.
++        break;
++      } else {
++        // Log the error received
++        printf("recv returned %d, errno = %d = %s\n", read, GetError(),
++             GetErrorString());
++        return -1;
++      }
++    }
++  }
++
++  return total_read;
++}
++
++// Returns -1 for error, number of bytes written for success.
++// The timeout here only applies to the span between packets of data, for the
++// sake of simplicity.
++int HttpSocket::Write(const char* data, int len, int timeout_in_ms) {
++  int total_sent = 0;
++  int to_send = len;
++
++  if (socket_fd_ == -1) {
++    printf("Socket to %s not open. Cannot write.\n", domain_name_.c_str());
++    return -1;
++  }
++  while (to_send > 0) {
++    int sent;
++    if (secure_connect_)
++      sent = SSL_write(ssl_, data, to_send);
++    else
++      sent = send(socket_fd_, data, to_send, 0);
++
++    if (sent > 0) {
++      to_send -= sent;
++      data += sent;
++      total_sent += sent;
++    } else if (sent == 0) {
++      // We filled up the pipe.  Wait for room to write.
++      if (!SocketWait(socket_fd_, /* for_read */ false, timeout_in_ms)) {
++        printf("unable to write to %s\n", domain_name_.c_str());
++        return -1;
++      }
++    } else {
++      printf("send returned %d, errno = %d\n", sent, GetError());
++      return -1;
++    }
++  }
++
++  return total_sent;
++}
++
++}  // namespace CDMi
+Index: git/HttpSocket.h
+===================================================================
+--- /dev/null
++++ git/HttpSocket.h
+@@ -0,0 +1,52 @@
++// Copyright 2018 Google LLC. All Rights Reserved. This file and proprietary
++// source code may only be used and distributed under the Widevine Master
++// License Agreement.
++
++#ifndef CDM_TEST_HTTP_SOCKET_H_
++#define CDM_TEST_HTTP_SOCKET_H_
++
++#include <stdlib.h>
++#include <string>
++#include <openssl/ssl.h>
++
++namespace CDMi {
++
++// Provides basic Linux based TCP socket interface.
++class HttpSocket {
++ public:
++  // A scheme (http:// or https://) is required for the URL.
++  explicit HttpSocket(const std::string& url);
++  ~HttpSocket();
++
++  bool Connect(int timeout_in_ms);
++  void CloseSocket();
++
++  const std::string& scheme() const { return scheme_; }
++  bool secure_connect() const { return secure_connect_; }
++  const std::string& domain_name() const { return domain_name_; }
++  int port() const { return atoi(port_.c_str()); }
++  const std::string& resource_path() const { return resource_path_; }
++
++  int Read(char* data, int len, int timeout_in_ms);
++  int Write(const char* data, int len, int timeout_in_ms);
++
++ private:
++  static bool ParseUrl(const std::string& url, std::string* scheme,
++                       bool* secure_connect, std::string* domain_name,
++                       std::string* port, std::string* path);
++
++  std::string scheme_;
++  bool secure_connect_;
++  std::string domain_name_;
++  std::string port_;
++  std::string resource_path_;
++  bool valid_url_;
++
++  int socket_fd_;
++  SSL* ssl_;
++  SSL_CTX* ssl_ctx_;
++};
++
++}  // namespace CDMi
++
++#endif  // CDM_TEST_HTTP_SOCKET_H_
+Index: git/LicenseRequest.cpp
+===================================================================
+--- /dev/null
++++ git/LicenseRequest.cpp
+@@ -0,0 +1,59 @@
++// Copyright 2018 Google LLC. All Rights Reserved. This file and proprietary
++// source code may only be used and distributed under the Widevine Master
++// License Agreement.
++
++#include "LicenseRequest.h"
++
++namespace CDMi {
++
++namespace {
++const std::string kTwoBlankLines("\r\n\r\n");
++}  // namespace
++
++size_t LicenseRequest::FindHeaderEndPosition(
++    const std::string& response) const {
++  return response.find(kTwoBlankLines);
++}
++
++// This routine parses the license server's response message and
++// extracts the drm message from the response header.
++void LicenseRequest::GetDrmMessage(const std::string& response,
++                                   std::string& drm_msg) {
++  if (response.empty()) {
++    drm_msg.clear();
++    return;
++  }
++
++  // Extracts DRM message.
++  // Content-Length = GLS line + Header(s) + empty line + drm message;
++  // we use the empty line to locate the drm message, and compute
++  // the drm message length as below instead of using Content-Length
++  size_t header_end_pos = FindHeaderEndPosition(response);
++  if (header_end_pos != std::string::npos) {
++    header_end_pos += kTwoBlankLines.size();  // points to response body
++
++    drm_msg.clear();
++    // Messages from Google Play server add a GLS wrapper.  These start
++    // with "GLS/1.0 <status>".
++    if (response.find("GLS/1.", header_end_pos) == header_end_pos) {
++      // For GLS messages, we should skip past the next blank line, and use
++      // what's left of the message.
++      size_t drm_msg_pos = response.find(kTwoBlankLines, header_end_pos);
++      if (drm_msg_pos != std::string::npos) {
++        drm_msg_pos += kTwoBlankLines.size();  // points to drm message
++        drm_msg = response.substr(drm_msg_pos);
++      } else {
++        printf("Message had GLS marker, but did not have extra blank line.\n");
++        drm_msg = response.substr(header_end_pos);
++      }
++    } else {
++      // For servers that do not use the GLS wrapper, we should just strip of
++      // the headers, and use the rest of the message.
++      drm_msg = response.substr(header_end_pos);
++    }
++  } else {
++    printf("response body not found\n");
++  }
++}
++
++}  // namespace CDMi
+Index: git/LicenseRequest.h
+===================================================================
+--- /dev/null
++++ git/LicenseRequest.h
+@@ -0,0 +1,29 @@
++// Copyright 2018 Google LLC. All Rights Reserved. This file and proprietary
++// source code may only be used and distributed under the Widevine Master
++// License Agreement.
++
++#ifndef CDM_TEST_LICENSE_REQUEST_H_
++#define CDM_TEST_LICENSE_REQUEST_H_
++
++#include <string>
++
++namespace CDMi {
++
++// Parses response from a license request.
++// This class assumes a particular response format defined by
++// Google license servers.
++class LicenseRequest {
++ public:
++  LicenseRequest() {};
++  ~LicenseRequest() {};
++
++  void GetDrmMessage(const std::string& response, std::string& drm_msg);
++
++ private:
++  size_t FindHeaderEndPosition(const std::string& response) const;
++
++};
++
++}  // namespace CDMi
++
++#endif  // CDM_TEST_LICENSE_REQUEST_H_
+Index: git/Platform.h
+===================================================================
+--- /dev/null
++++ git/Platform.h
+@@ -0,0 +1,33 @@
++// Copyright 2018 Google LLC. All Rights Reserved. This file and proprietary
++// source code may only be used and distributed under the Widevine Master
++// License Agreement.
++//
++// Platform - Abstracts some utilities between platforms.
++//
++#ifndef WVCDM_UTIL_PLATFORM_H_
++#define WVCDM_UTIL_PLATFORM_H_
++
++#include "util_common.h"
++
++#ifdef _WIN32
++# include <wtypes.h>
++# include <BaseTsd.h>
++# include <winsock2.h>  // For htonl and ntohl.
++# define __PRETTY_FUNCTION__ __FUNCTION__
++# undef NO_ERROR
++# undef GetCurrentTime
++# undef DeleteFile
++
++using ssize_t = SSIZE_T;
++
++inline void sleep(int seconds) {
++  Sleep(seconds * 1000);
++}
++CORE_UTIL_EXPORT int setenv(const char* key, const char* value, int overwrite);
++#else
++# include <arpa/inet.h>
++# include <sys/types.h>
++# include <unistd.h>
++#endif
++
++#endif  // WVCDM_UTIL_PLATFORM_H_
+Index: git/UrlRequest.cpp
+===================================================================
+--- /dev/null
++++ git/UrlRequest.cpp
+@@ -0,0 +1,177 @@
++// Copyright 2018 Google LLC. All Rights Reserved. This file and proprietary
++// source code may only be used and distributed under the Widevine Master
++// License Agreement.
++
++
++#include <errno.h>
++#include <sstream>
++
++#include "UrlRequest.h"
++#include "HttpSocket.h"
++#include "string_conversions.h"
++
++namespace CDMi {
++
++namespace {
++
++const int kMaxConnectAttempts = 3;
++const int kReadBufferSize = 1024;
++const int kConnectTimeoutMs = 15000;
++const int kWriteTimeoutMs = 12000;
++const int kReadTimeoutMs = 12000;
++
++// Concatenate all chunks into one blob and returns the response with
++// header information.
++void ConcatenateChunkedResponse(const std::string http_response,
++                                std::string* modified_response) {
++  if (http_response.empty()) return;
++
++  modified_response->clear();
++  const std::string kChunkedTag = "Transfer-Encoding: chunked\r\n\r\n";
++  size_t chunked_tag_pos = http_response.find(kChunkedTag);
++  if (std::string::npos != chunked_tag_pos) {
++    // processes chunked encoding
++    size_t chunk_size = 0;
++    size_t chunk_size_pos = chunked_tag_pos + kChunkedTag.size();
++    sscanf(&http_response[chunk_size_pos], "%zx", &chunk_size);
++    if (chunk_size > http_response.size()) {
++      // precaution, in case we misread chunk size
++      printf("invalid chunk size %u\n", chunk_size);
++      return;
++    }
++
++    // Search for chunks in the following format:
++    // header
++    // chunk size\r\n  <-- chunk_size_pos @ beginning of chunk size
++    // chunk data\r\n  <-- chunk_pos @ beginning of chunk data
++    // chunk size\r\n
++    // chunk data\r\n
++    // 0\r\n
++    const std::string kCrLf = "\r\n";
++    size_t chunk_pos = http_response.find(kCrLf, chunk_size_pos);
++    modified_response->assign(http_response, 0, chunk_size_pos);
++
++    while ((chunk_size > 0) && (std::string::npos != chunk_pos)) {
++      chunk_pos += kCrLf.size();
++      modified_response->append(http_response, chunk_pos, chunk_size);
++
++      // Search for next chunk
++      chunk_size_pos = chunk_pos + chunk_size + kCrLf.size();
++      sscanf(&http_response[chunk_size_pos], "%zx", &chunk_size);
++      if (chunk_size > http_response.size()) {
++        // precaution, in case we misread chunk size
++        printf("invalid chunk size %u\n", chunk_size);
++        break;
++      }
++      chunk_pos = http_response.find(kCrLf, chunk_size_pos);
++    }
++  } else {
++    // Response is not chunked encoded
++    modified_response->assign(http_response);
++  }
++}
++
++}  // namespace
++
++UrlRequest::UrlRequest(const std::string& url)
++    : is_connected_(false), socket_(url) {
++  Reconnect();
++}
++
++UrlRequest::~UrlRequest() {}
++
++void UrlRequest::Reconnect() {
++  for(uint32_t i = 0; i < kMaxConnectAttempts && !is_connected_; ++i) {
++    socket_.CloseSocket();
++    if (socket_.Connect(kConnectTimeoutMs)) {
++      is_connected_ = true;
++    } else {
++      printf("failed to connect to %s, port=%d\n", socket_.domain_name().c_str(),
++           socket_.port());
++    }
++  }
++}
++
++bool UrlRequest::GetResponse(std::string* message) {
++  std::string response;
++
++  // Keep reading until end of stream (0 bytes read) or timeout.  Partial
++  // buffers worth of data can and do happen, especially with OpenSSL in
++  // non-blocking mode.
++  while (true) {
++    char read_buffer[kReadBufferSize];
++    int bytes = socket_.Read(read_buffer, sizeof(read_buffer), kReadTimeoutMs);
++    if (bytes > 0) {
++      response.append(read_buffer, bytes);
++    } else if (bytes < 0) {
++      printf("read error, errno = %d\n", errno);
++      return false;
++    } else {
++      // end of stream.
++      break;
++    }
++  }
++
++  ConcatenateChunkedResponse(response, message);
++//  LOGV("HTTP response: (%d): %s", message->size(), message->c_str());
++  return true;
++}
++
++// static
++int UrlRequest::GetStatusCode(const std::string& response) {
++  const std::string kHttpVersion("HTTP/1.1 ");
++
++  int status_code = -1;
++  size_t pos = response.find(kHttpVersion);
++  if (pos != std::string::npos) {
++    pos += kHttpVersion.size();
++    sscanf(response.substr(pos).c_str(), "%d", &status_code);
++  }
++  return status_code;
++}
++
++bool UrlRequest::PostRequestWithPath(const std::string& path,
++                                     const std::string& data) {
++  std::string request;
++
++  request.append("POST ");
++  request.append(path);
++  request.append(" HTTP/1.1\r\n");
++
++  request.append("Host: ");
++  request.append(socket_.domain_name());
++  request.append("\r\n");
++
++  request.append("Connection: close\r\n");
++  request.append("User-Agent: Widevine CDM v1.0\r\n");
++
++  // buffer to store length of data as a string
++  char data_size_buffer[32] = {0};
++  snprintf(data_size_buffer, sizeof(data_size_buffer), "%zd", data.size());
++
++  request.append("Content-Length: ");
++  request.append(data_size_buffer);  // appends size of data
++  request.append("\r\n");
++
++  request.append("\r\n");  // empty line to terminate headers
++
++  request.append(data);
++
++  int ret = socket_.Write(request.c_str(), request.size(), kWriteTimeoutMs);
++  //LOGV("HTTP request: (%d): %s", request.size(), b2a_hex(request).c_str());
++  return ret != -1;
++}
++
++bool UrlRequest::PostRequest(const std::string& data) {
++  return PostRequestWithPath(socket_.resource_path(), data);
++}
++
++bool UrlRequest::PostCertRequestInQueryString(const std::string& data) {
++  std::string path = socket_.resource_path();
++  path.append((path.find('?') == std::string::npos) ? "?" : "&");
++  path.append("signedRequest=");
++  path.append(data);
++  return PostRequestWithPath(path, "");
++}
++
++}  // namespace CDMi
+Index: git/UrlRequest.h
+===================================================================
+--- /dev/null
++++ git/UrlRequest.h
+@@ -0,0 +1,39 @@
++// Copyright 2018 Google LLC. All Rights Reserved. This file and proprietary
++// source code may only be used and distributed under the Widevine Master
++// License Agreement.
++
++#ifndef CDM_TEST_URL_REQUEST_H_
++#define CDM_TEST_URL_REQUEST_H_
++
++#include <string>
++#include "HttpSocket.h"
++
++namespace CDMi {
++
++// Provides simple HTTP request and response service.
++// Only POST request method is implemented.
++class UrlRequest {
++ public:
++  explicit UrlRequest(const std::string& url);
++  ~UrlRequest();
++
++  bool is_connected() const { return is_connected_; }
++  void Reconnect();
++
++  bool PostRequest(const std::string& data);
++  bool PostCertRequestInQueryString(const std::string& data);
++
++  bool GetResponse(std::string* message);
++  static int GetStatusCode(const std::string& response);
++
++ private:
++  bool PostRequestWithPath(const std::string& path, const std::string& data);
++
++  bool is_connected_;
++  HttpSocket socket_;
++
++};
++
++}  // namespace CDMi
++
++#endif  // CDM_TEST_URL_REQUEST_H_
+Index: git/CMakeLists.txt
+===================================================================
+--- git.orig/CMakeLists.txt
++++ git/CMakeLists.txt
+@@ -13,18 +13,22 @@ set(MODULE_NAME WPEFramework${PLUGIN_NAM
+ 
+ find_package(${NAMESPACE}Core REQUIRED)
+ find_package(WideVine REQUIRED)
++find_package(OpenSSL REQUIRED)
+ 
+ set(PLUGIN_SOURCES
+     HostImplementation.cpp
+     DeviceCertificate.cpp
+     MediaSession.cpp
+-    MediaSystem.cpp)
++    MediaSystem.cpp
++    HttpSocket.cpp
++    LicenseRequest.cpp
++    UrlRequest.cpp)
+ 
+ # add the library
+ add_library(${PLUGIN_NAME} SHARED ${PLUGIN_SOURCES})
+ target_compile_definitions(${PLUGIN_NAME} PRIVATE ${WIDEVINE_FLAGS})
+-target_include_directories(${PLUGIN_NAME} PRIVATE ${PLUGINS_INCLUDE_DIR} ${WIDEVINE_INCLUDE_DIRS})
+-target_link_libraries(${PLUGIN_NAME} PRIVATE ${PLUGIN_LIBS} ${NAMESPACE}Core::${NAMESPACE}Core ${WIDEVINE_LIBRARIES})
++target_include_directories(${PLUGIN_NAME} PRIVATE ${PLUGINS_INCLUDE_DIR} ${WIDEVINE_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIRS})
++target_link_libraries(${PLUGIN_NAME} PRIVATE ${PLUGIN_LIBS} ${NAMESPACE}Core::${NAMESPACE}Core ${WIDEVINE_LIBRARIES} ${OPENSSL_LIBRARIES})
+ set_target_properties(${PLUGIN_NAME} PROPERTIES SUFFIX ".drm")
+ set_target_properties(${PLUGIN_NAME} PROPERTIES PREFIX "")
+ 

@@ -1,0 +1,25 @@
+From 174af3a26f22fb4558972a5d94e0b2a7094047f6 Mon Sep 17 00:00:00 2001
+From: Xueling Li <xueling.li@amlogic.com>
+Date: Wed, 2 Dec 2020 06:27:20 +0000
+Subject: [PATCH] fix sample size calculate error
+
+---
+ MediaSession.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/MediaSession.cpp b/MediaSession.cpp
+index 8412b74..bc55964 100644
+--- a/MediaSession.cpp
++++ b/MediaSession.cpp
+@@ -357,7 +357,7 @@ CDMi_RESULT MediaKeySession::Decrypt(
+ 
+         pbEncrypted = pbDataItr
+             + subSampleCount * (sizeof(inClear) + sizeof(inEncrypted));
+-        cbEncrypted = f_cbData - sizeof(secureHandle) - sizeof(subSampleCount)
++        cbEncrypted = f_cbData - sizeof(secureHandle) - sizeof(subSampleCount) - sizeof(magic)
+             - subSampleCount * (sizeof(inClear) + sizeof(inEncrypted));
+         widevine::Cdm::OutputBuffer output;
+         widevine::Cdm::InputBuffer input;
+-- 
+2.17.1
+

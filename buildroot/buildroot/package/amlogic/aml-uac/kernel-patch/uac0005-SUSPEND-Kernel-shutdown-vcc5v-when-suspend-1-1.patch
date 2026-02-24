@@ -1,0 +1,70 @@
+From 620357b0f1354d978ff7b8a25c7eadfe7a1c6230 Mon Sep 17 00:00:00 2001
+From: chongzhang.gong <chongzhang.gong@amlogic.com>
+Date: Mon, 17 Jan 2022 15:12:20 +0800
+Subject: [PATCH] suspend: showdown VCC5V_EN(GPIOA_1) when suspend [1/1]
+
+PD#SWPL-70240
+
+Problem:
+need to pull down VCC5V_EN(GPIOA_1) when suspend
+
+Solution:
+control GPIOA_1 in gpioled pm_suspend/pm_resume
+
+Verify:
+t404-a113l
+
+Change-Id: Ia144404882789074301b8bd2d220ca8b4e293da2
+Signed-off-by: chongzhang.gong <chongzhang.gong@amlogic.com>
+---
+
+diff --git a/drivers/leds/leds-gpio.c b/drivers/leds/leds-gpio.c
+index 764c3130..f084e97 100644
+--- a/drivers/leds/leds-gpio.c
++++ b/drivers/leds/leds-gpio.c
+@@ -276,9 +276,45 @@
+ 	}
+ }
+ 
++#ifdef CONFIG_AMLOGIC_MODIFY
++static int gpio_led_suspend(struct platform_device *pdev, pm_message_t state)
++{
++	struct gpio_leds_priv *priv = platform_get_drvdata(pdev);
++	int i;
++
++	for (i = 0; i < priv->num_leds; i++) {
++		struct gpio_led_data *led = &priv->leds[i];
++
++		if (strcmp("spi_led_en", led->cdev.name))
++			gpio_led_set(&led->cdev, LED_OFF);
++	}
++
++	return 0;
++}
++
++static int gpio_led_resume(struct platform_device *pdev)
++{
++	struct gpio_leds_priv *priv = platform_get_drvdata(pdev);
++	int i;
++
++	for (i = 0; i < priv->num_leds; i++) {
++		struct gpio_led_data *led = &priv->leds[i];
++
++		if (strcmp("spi_led_en", led->cdev.name))
++			gpio_led_set(&led->cdev, LED_ON);
++	}
++
++	return 0;
++}
++#endif
++
+ static struct platform_driver gpio_led_driver = {
+ 	.probe		= gpio_led_probe,
+ 	.shutdown	= gpio_led_shutdown,
++#ifdef CONFIG_AMLOGIC_MODIFY
++	.suspend	= gpio_led_suspend,
++	.resume		= gpio_led_resume,
++#endif
+ 	.driver		= {
+ 		.name	= "leds-gpio",
+ 		.of_match_table = of_gpio_leds_match,

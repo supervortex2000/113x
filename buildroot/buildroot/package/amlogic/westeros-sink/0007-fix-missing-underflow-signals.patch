@@ -1,0 +1,56 @@
+From 72fd8feb769b4591aae407c56d0b595ce74b7f6e Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Fri, 2 Apr 2021 09:20:58 +0800
+Subject: [PATCH] fix missing underflow signals
+
+Change-Id: I363dae566db07ab835bea5563d6bc3e77f389e51
+---
+ westeros-sink/v4l2/westeros-sink-soc.c | 25 +++++++++++++------------
+ 1 file changed, 13 insertions(+), 12 deletions(-)
+
+diff --git a/westeros-sink/v4l2/westeros-sink-soc.c b/westeros-sink/v4l2/westeros-sink-soc.c
+index 1746c81..5080c7a 100644
+--- a/westeros-sink/v4l2/westeros-sink-soc.c
++++ b/westeros-sink/v4l2/westeros-sink-soc.c
+@@ -4951,6 +4951,18 @@ capture_start:
+ 
+    for( ; ; )
+    {
++      if ( sink->soc.emitFirstFrameSignal )
++      {
++         sink->soc.emitFirstFrameSignal= FALSE;
++         GST_DEBUG("wstVideoOutputThread: emit first frame signal");
++         g_signal_emit (G_OBJECT (sink), g_signals[SIGNAL_FIRSTFRAME], 0, 2, NULL);
++      }
++      if ( sink->soc.emitUnderflowSignal )
++      {
++         sink->soc.emitUnderflowSignal= FALSE;
++         GST_DEBUG("wstVideoOutputThread: emit underflow signal");
++         g_signal_emit (G_OBJECT (sink), g_signals[SIGNAL_UNDERFLOW], 0, 0, NULL);
++      }
+       if ( sink->soc.quitVideoOutputThread )
+       {
+          break;
+@@ -5240,18 +5252,7 @@ capture_start:
+             UNLOCK(sink);
+          }
+       }
+-      if ( sink->soc.emitFirstFrameSignal )
+-      {
+-         sink->soc.emitFirstFrameSignal= FALSE;
+-         GST_DEBUG("wstVideoOutputThread: emit first frame signal");
+-         g_signal_emit (G_OBJECT (sink), g_signals[SIGNAL_FIRSTFRAME], 0, 2, NULL);
+-      }
+-      if ( sink->soc.emitUnderflowSignal )
+-      {
+-         sink->soc.emitUnderflowSignal= FALSE;
+-         GST_DEBUG("wstVideoOutputThread: emit underflow signal");
+-         g_signal_emit (G_OBJECT (sink), g_signals[SIGNAL_UNDERFLOW], 0, 0, NULL);
+-      }
++
+    }
+ 
+    if ( sink->soc.needCaptureRestart )
+-- 
+2.31.0
+

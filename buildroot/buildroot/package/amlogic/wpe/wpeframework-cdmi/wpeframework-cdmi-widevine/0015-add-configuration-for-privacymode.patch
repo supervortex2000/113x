@@ -1,0 +1,21 @@
+diff --git a/MediaSystem.cpp b/MediaSystem.cpp
+index 7ec2a86..dd2c27a 100644
+--- a/MediaSystem.cpp
++++ b/MediaSystem.cpp
+@@ -171,7 +171,15 @@ public:
+ 
+         if (widevine::Cdm::kSuccess == widevine::Cdm::initialize(
+                 widevine::Cdm::kOpaqueHandle, client_info, &_host, &_host, &_host, static_cast<widevine::Cdm::LogLevel>(0))) {
+-            const bool kEnablePrivacyMode = true;
++            bool kEnablePrivacyMode = true;
++            const char* privacy_mode = getenv("privacymode");
++            if (privacy_mode)
++            {
++                if((strncmp("n",privacy_mode,1)== 0) || (strncmp("N",privacy_mode,1)== 0))
++                {
++                    kEnablePrivacyMode = false;
++                }
++            }
+             _cdm = widevine::Cdm::create(this, &_host, kEnablePrivacyMode);
+         }
+         if (_cdm && !_cdm->isProvisioned()) {

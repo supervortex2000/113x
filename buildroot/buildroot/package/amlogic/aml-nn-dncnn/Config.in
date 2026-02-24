@@ -1,0 +1,5 @@
+config BR2_PACKAGE_AML_NN_DNCNN
+    bool " aml nn dncnn"
+    help
+        Test program for NN
+    depends on BR2_PACKAGE_NPU

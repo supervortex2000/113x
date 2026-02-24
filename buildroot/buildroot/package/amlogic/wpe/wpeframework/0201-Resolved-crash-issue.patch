@@ -1,0 +1,54 @@
+From 773cc49cf77bd5ccf2c37daa30402f25e98ef9f4 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Mon, 14 Jun 2021 14:08:59 +0800
+Subject: [PATCH] Resolved crash issue
+
+Avoid memory overflow when invoke UnknownProxy::Release
+at the same time in two different pthread.
+
+Change-Id: I1a56477df4862554609311afbd6cf049f9d00050
+---
+ Source/com/IUnknown.h | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/Source/com/IUnknown.h b/Source/com/IUnknown.h
+index 43a851bd..aba15421 100644
+--- a/Source/com/IUnknown.h
++++ b/Source/com/IUnknown.h
+@@ -141,6 +141,7 @@ namespace ProxyStub {
+         UnknownProxy(const Core::ProxyType<Core::IPCChannel>& channel, const RPC::instance_id& implementation, const uint32_t interfaceId, const bool outbound, Core::IUnknown& parent)
+             : _adminLock()
+             , _refCount(0)
++            , _is_deleting(false)
+             , _mode(outbound ? 0 : CACHING_ADDREF)
+             , _interfaceId(interfaceId)
+             , _implementation(implementation)
+@@ -191,7 +192,7 @@ namespace ProxyStub {
+             _adminLock.Lock();
+             _refCount--;
+ 
+-            if (_refCount != 0) {
++            if (_refCount != 0 || true == _is_deleting) {
+                 _adminLock.Unlock();
+             }
+             else {
+@@ -216,7 +217,7 @@ namespace ProxyStub {
+                         result = message->Response().Reader().Number<uint32_t>();
+                     }
+                 }
+-
++                _is_deleting = true;
+                 _adminLock.Unlock();
+ 
+                 // Remove our selves from the Administration, we are done..
+@@ -353,6 +354,7 @@ namespace ProxyStub {
+     private:
+         mutable Core::CriticalSection _adminLock;
+         mutable uint32_t _refCount;
++        mutable bool _is_deleting{false};
+         uint8_t _mode;
+         const uint32_t _interfaceId;
+         RPC::instance_id _implementation;
+-- 
+2.31.0
+

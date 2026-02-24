@@ -1,0 +1,8 @@
+menu "sample"
+config BR2_PACKAGE_SAMPLE
+	bool "mbi sample"
+    depends on BR2_PACKAGE_MBI
+    depends on BR2_PACKAGE_SENSOR
+	help
+	   sample
+endmenu

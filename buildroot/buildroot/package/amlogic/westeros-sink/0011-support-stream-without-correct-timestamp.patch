@@ -1,0 +1,88 @@
+From 7c22fb17ef5a4e1343f787d7a6a3dd24b56d5742 Mon Sep 17 00:00:00 2001
+From: Song Zhao <song.zhao@amlogic.com>
+Date: Wed, 24 Feb 2021 01:24:55 -0800
+Subject: [PATCH 11/14] support stream without correct timestamp
+
+---
+ westeros-sink/v4l2/westeros-sink-soc.c | 24 +++++++++++++++++++++---
+ westeros-sink/v4l2/westeros-sink-soc.h |  1 +
+ 2 files changed, 22 insertions(+), 3 deletions(-)
+
+diff --git a/westeros-sink/v4l2/westeros-sink-soc.c b/westeros-sink/v4l2/westeros-sink-soc.c
+index 5080c7a..61f519b 100644
+--- a/westeros-sink/v4l2/westeros-sink-soc.c
++++ b/westeros-sink/v4l2/westeros-sink-soc.c
+@@ -1430,6 +1430,9 @@ void gst_westeros_sink_soc_render( GstWesterosSink *sink, GstBuffer *buffer )
+             }
+          }
+          UNLOCK(sink);
++      } else {
++        GST_WARNING("ptsCalc true");
++         sink->soc.ptsCalc= TRUE;
+       }
+ 
+       #ifdef USE_GST_ALLOCATORS
+@@ -1553,6 +1556,7 @@ void gst_westeros_sink_soc_render( GstWesterosSink *sink, GstBuffer *buffer )
+                   GstClockTime timestamp= GST_BUFFER_PTS(buffer) + 500LL;
+                   GST_TIME_TO_TIMEVAL( timestamp, sink->soc.inBuffers[buffIndex].buf.timestamp );
+                }
++
+                sink->soc.inBuffers[buffIndex].buf.bytesused= copylen;
+                if ( sink->soc.isMultiPlane )
+                {
+@@ -4286,6 +4290,7 @@ static void wstDecoderReset( GstWesterosSink *sink, bool hard )
+    sink->soc.prevFrame2Fd= -1;
+    sink->soc.nextFrameFd= -1;
+    sink->soc.formatsSet= FALSE;
++   sink->soc.ptsCalc= FALSE;
+ }
+ 
+ typedef struct bufferInfo
+@@ -5124,9 +5129,20 @@ capture_start:
+          {
+             bool gfxFrame= false;
+             sink->soc.resubFd= -1;
+-
+-            gint64 currFramePTS= sink->soc.outBuffers[buffIndex].buf.timestamp.tv_sec * 1000000LL + sink->soc.outBuffers[buffIndex].buf.timestamp.tv_usec;
+-            guint64 frameTime= sink->soc.outBuffers[buffIndex].buf.timestamp.tv_sec * 1000000000LL + sink->soc.outBuffers[buffIndex].buf.timestamp.tv_usec * 1000LL;
++            guint64 currFramePTS= 0;
++            guint64 frameTime= 0;
++
++            if ( !sink->soc.ptsCalc ) {
++               currFramePTS= sink->soc.outBuffers[buffIndex].buf.timestamp.tv_sec * 1000000LL + sink->soc.outBuffers[buffIndex].buf.timestamp.tv_usec;
++               frameTime= sink->soc.outBuffers[buffIndex].buf.timestamp.tv_sec * 1000000000LL + sink->soc.outBuffers[buffIndex].buf.timestamp.tv_usec * 1000LL;
++            } else {
++               double frameRate;
++
++               frameRate= (sink->soc.frameRate > 0.0 ? sink->soc.frameRate : 30.0);
++               currFramePTS= (1000000 / sink->soc.frameRate) * sink->soc.frameOutCount;
++               currFramePTS += sink->positionSegmentStart / 1000;
++               frameTime= currFramePTS * 1000;
++            }
+             FRAME("out:       frame %d buffer %d (%d) PTS %lld decoded", sink->soc.frameOutCount, sink->soc.outBuffers[buffIndex].bufferId, buffIndex, frameTime);
+             avProgLog( frameTime, 0, "DtoS", "");
+ 
+@@ -5136,6 +5152,8 @@ capture_start:
+             if ( wstLocalRateControl( sink, buffIndex ) )
+             {
+                wstRequeueOutputBuffer( sink, buffIndex );
++               if (sink->soc.ptsCalc)
++                  ++sink->soc.frameOutCount;
+                UNLOCK(sink);
+                continue;
+             }
+diff --git a/westeros-sink/v4l2/westeros-sink-soc.h b/westeros-sink/v4l2/westeros-sink-soc.h
+index 68ca1b8..fe2df98 100644
+--- a/westeros-sink/v4l2/westeros-sink-soc.h
++++ b/westeros-sink/v4l2/westeros-sink-soc.h
+@@ -218,6 +218,7 @@ struct _GstWesterosSinkSoc
+    gboolean frameStepOnPreroll;
+    gboolean forceAspectRatio;
+ 
++   gboolean ptsCalc;
+    gboolean lowMemoryMode;
+    gboolean secureVideo;
+    gboolean useDmabufOutput;
+-- 
+2.31.0
+

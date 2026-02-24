@@ -1,0 +1,11 @@
+config BR2_PACKAGE_AML_TVSERVER
+    bool "aml_tvserver"
+    select BR2_PACKAGE_HAL_AUDIO_SERVICE
+    select BR2_PACKAGE_LIBBINDER
+    select BR2_PACKAGE_LIBLOG
+    select BR2_PACKAGE_TUNER
+    help
+      amlogic tv library and bin.
+
+      http://openlinux.amlogic.com
+

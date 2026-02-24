@@ -1,0 +1,87 @@
+From dff092b9fc283fe257de0eb13b94849d6d9bda38 Mon Sep 17 00:00:00 2001
+From: Song Zhao <song.zhao@amlogic.com>
+Date: Fri, 12 Mar 2021 22:28:38 -0800
+Subject: [PATCH 2/2] rawsink: set video layer after server connection
+
+westeros-soc-drm add pip support, it needs the video layer as the first
+command
+
+Change-Id: I86da060d090c31097607d2315d30c1c507d3f43a
+---
+ westeros-sink/raw/westeros-sink-soc.c | 46 +++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+
+diff --git a/westeros-sink/raw/westeros-sink-soc.c b/westeros-sink/raw/westeros-sink-soc.c
+index 4e7bb3c..eef86e7 100644
+--- a/westeros-sink/raw/westeros-sink-soc.c
++++ b/westeros-sink/raw/westeros-sink-soc.c
+@@ -106,6 +106,7 @@ static void wstSetSessionInfo( GstWesterosSink *sink );
+ static void wstSendFlushVideoClientConnection( WstVideoClientConnection *conn );
+ static void wstSendRectVideoClientConnection( WstVideoClientConnection *conn );
+ static void wstSendRateVideoClientConnection( WstVideoClientConnection *conn );
++static void wstSendLayerVideoClientConnection( WstVideoClientConnection *conn );
+ static void wstProcessMessagesVideoClientConnection( WstVideoClientConnection *conn );
+ static bool wstSendFrameVideoClientConnection( WstVideoClientConnection *conn, int buffIndex );
+ static gpointer wstDispatchThread(gpointer data);
+@@ -628,6 +629,8 @@ gboolean gst_westeros_sink_soc_ready_to_paused( GstWesterosSink *sink, gboolean
+             wl_vpc_destroy( sink->vpc );
+             sink->vpc= 0;
+          }
++      } else {
++         wstSendLayerVideoClientConnection( sink->soc.conn );
+       }
+    }
+ 
+@@ -2166,6 +2169,49 @@ static void wstSendRateVideoClientConnection( WstVideoClientConnection *conn )
+    }
+ }
+ 
++static void wstSendLayerVideoClientConnection( WstVideoClientConnection *conn )
++{
++   if ( conn )
++   {
++      struct msghdr msg;
++      struct iovec iov[1];
++      unsigned char mbody[5];
++      int len;
++      int sentLen;
++
++      msg.msg_name= NULL;
++      msg.msg_namelen= 0;
++      msg.msg_iov= iov;
++      msg.msg_iovlen= 1;
++      msg.msg_control= 0;
++      msg.msg_controllen= 0;
++      msg.msg_flags= 0;
++
++      len= 0;
++      mbody[len++]= 'V';
++      mbody[len++]= 'S';
++      mbody[len++]= 2;
++      mbody[len++]= 'N';
++      /* main plane only for now */
++      mbody[len++]= 0;
++
++      iov[0].iov_base= (char*)mbody;
++      iov[0].iov_len= len;
++
++      do
++      {
++         sentLen= sendmsg( conn->socketFd, &msg, MSG_NOSIGNAL );
++      }
++      while ( (sentLen < 0) && (errno == EINTR));
++
++      if ( sentLen == len )
++      {
++         GST_LOG("sent pip 0 to video server");
++         g_print("sent pip 0 to video server\n");
++      }
++   }
++}
++
+ static void wstProcessMessagesVideoClientConnection( WstVideoClientConnection *conn )
+ {
+    if ( conn )
+-- 
+2.31.0
+

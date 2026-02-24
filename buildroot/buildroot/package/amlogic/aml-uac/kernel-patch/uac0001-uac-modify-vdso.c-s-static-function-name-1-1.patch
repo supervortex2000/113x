@@ -1,0 +1,48 @@
+From a0085f7a1dd40f3f623f9b3c59ce71f572905cec Mon Sep 17 00:00:00 2001
+From: "shu.wang" <shu.wang@amlogic.com>
+Date: Wed, 17 Nov 2021 15:47:37 +0800
+Subject: [PATCH] uac: modify vdso.c's static function name [1/1]
+
+PD#None
+
+Problem:
+In order to solve the problem of compilation conflicts after cropping
+"CONFIG_PSTORE_FTRACE"
+
+Solution:
+modify vdso.c's static function name
+
+Verify:
+A113L-AD403
+
+Change-Id: I242cc07c05e13c50654154b05af6debd35a4d8b0
+Signed-off-by: shu.wang <shu.wang@amlogic.com>
+---
+ arch/arm/kernel/vdso.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+index 6a41e35a7d45c..e5747b07d1526 100644
+--- a/arch/arm/kernel/vdso.c
++++ b/arch/arm/kernel/vdso.c
+@@ -145,7 +145,7 @@ static void * __init find_section(Elf32_Ehdr *ehdr, const char *name,
+ #ifdef CONFIG_AMLOGIC_DEBUG_FTRACE_PSTORE
+ static Elf32_Sym * __init _find_symbol(struct elfinfo *lib, const char *symname)
+ #else
+-static Elf32_Sym * __init find_symbol(struct elfinfo *lib, const char *symname)
++static Elf32_Sym * __init local_find_symbol(struct elfinfo *lib, const char *symname)
+ #endif
+ {
+ 	unsigned int i;
+@@ -173,7 +173,7 @@ static void __init vdso_nullpatch_one(struct elfinfo *lib, const char *symname)
+ #ifdef CONFIG_AMLOGIC_DEBUG_FTRACE_PSTORE
+ 	sym = _find_symbol(lib, symname);
+ #else
+-	sym = find_symbol(lib, symname);
++	sym = local_find_symbol(lib, symname);
+ #endif
+ 	if (!sym)
+ 		return;
+-- 
+2.31.1
+

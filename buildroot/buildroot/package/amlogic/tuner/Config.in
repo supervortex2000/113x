@@ -1,0 +1,36 @@
+config BR2_PACKAGE_TUNER
+	bool "tuner driver git repo"
+	depends on BR2_LINUX_KERNEL	
+	help
+	  The git of tuner driver git repo
+
+config BR2_PACKAGE_TUNER_GIT_VERSION
+	string "tuner branch" 
+	depends on BR2_PACKAGE_TUNER
+	help
+	  the branch of tuner driver
+
+config BR2_PACKAGE_TUNER_GIT_URL
+	string "tuner driver git repo url"
+	depends on BR2_PACKAGE_TUNER
+	help
+	  the URL of tuner driver git repo
+
+config BR2_PACKAGE_TUNER_LOCAL
+	bool "tuner driver local"
+	depends on BR2_PACKAGE_TUNER
+	help
+		tuner local
+
+config BR2_PACKAGE_TUNER_LOCAL_PATH
+	string "tuner local path"
+	depends on BR2_PACKAGE_TUNER_LOCAL
+	depends on BR2_PACKAGE_TUNER
+	help
+		tuner local path
+
+config BR2_PACKAGE_TUNER_STANDALONE
+	bool "standalone kernel module"
+	depends on BR2_PACKAGE_TUNER
+	help
+	  compile ko directly

@@ -1,0 +1,19 @@
+diff --git a/OpenCDMi/FrameworkRPC.cpp b/OpenCDMi/FrameworkRPC.cpp
+index 1734942..178a770 100644
+--- a/OpenCDMi/FrameworkRPC.cpp
++++ b/OpenCDMi/FrameworkRPC.cpp
+@@ -1162,6 +1162,14 @@ namespace Plugin {
+ 
+             ASSERT(subSystem != nullptr);
+ 
++            Core::JSON::String privacymode;
++            Core::JSON::Container container_privacymode;
++            container_privacymode.Add("privacymode", &privacymode);
++            container_privacymode.FromString(service->ConfigLine());
++            if (privacymode.Value().size())
++            {
++                Core::SystemInfo::SetEnvironment(_T("privacymode"), privacymode.Value());
++            }
+             // Start loading the configured factories
+             Config config;
+             config.FromString(service->ConfigLine());

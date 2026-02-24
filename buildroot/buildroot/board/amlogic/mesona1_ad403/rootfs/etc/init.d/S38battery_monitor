@@ -1,0 +1,37 @@
+#!/bin/sh
+
+#
+# Copyright (c) 2022 Amlogic, Inc. All rights reserved.
+# This source code is subject to the terms and conditions defined
+# in the file 'LICENSE' which is part of this source code package.
+# Description: S38 battery_monitor file
+#
+# Starts the battery_monitor daemon.
+#
+name=battery_monitor
+daemon=/usr/bin/$name
+dev=pmic6b-bat
+#report_interval: 1 ~ 90 s
+report_interval=60
+#alarm_capacity: 1-99 %
+alarm_capacity=1
+
+case "$1" in
+    start|"")
+        echo "Starting $name: "
+        if [ -f "$daemon" ]; then
+            $daemon -d $dev -r $report_interval -a $alarm_capacity  &
+        fi
+        ;;
+    stop)
+        echo "Stopping $name: "
+        pid=`ps | grep $name | grep -v grep | awk '{print $1}'`
+        if [ -n "$pid" ]; then
+            kill $pid1
+        fi
+        ;;
+    *)
+        echo "Usage: S38auto_shutdown {start|stop}" >&2
+        exit 1
+        ;;
+esac

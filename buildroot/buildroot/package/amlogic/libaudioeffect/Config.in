@@ -1,0 +1,5 @@
+config BR2_PACKAGE_LIBAUDIOEFFECT
+        bool "libaudioeffect"
+        select BR2_PACKAGE_AML_AMAUDIOUTILS
+        help
+          Audio Effect Library

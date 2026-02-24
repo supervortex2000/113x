@@ -1,0 +1,4 @@
+config BR2_PACKAGE_AML_SYSTEMD
+	bool "aml_systemd"
+	help
+	  systemd for miracast

@@ -1,0 +1,21 @@
+diff --git a/RDKShell/RDKShell.cpp b/RDKShell/RDKShell.cpp
+index 1e338d6..5aa74f9 100755
+--- a/RDKShell/RDKShell.cpp
++++ b/RDKShell/RDKShell.cpp
+@@ -2570,13 +2570,13 @@ namespace WPEFramework {
+         bool RDKShell::setInactivityInterval(const string interval)
+         {
+             gRdkShellMutex.lock();
+-            try
++            //try
+             {
+               CompositorController::setInactivityInterval(std::stod(interval));
+             }
+-            catch (...) 
++            //catch (...) 
+             {
+-              std::cout << "RDKShell unable to set inactivity interval  " << std::endl;
++            //  std::cout << "RDKShell unable to set inactivity interval  " << std::endl;
+             }
+             gRdkShellMutex.unlock();
+             return true;

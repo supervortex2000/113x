@@ -1,0 +1,25 @@
+From 6779eefe3403499fe226aa06b52054a003c5f0bf Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Fri, 22 Jan 2021 14:54:29 +0800
+Subject: [PATCH] Add Widevine CBCS Support
+
+---
+ Source/ocdm/DataExchange.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Source/ocdm/DataExchange.h b/Source/ocdm/DataExchange.h
+index 5744709..fff35f6 100644
+--- a/Source/ocdm/DataExchange.h
++++ b/Source/ocdm/DataExchange.h
+@@ -40,7 +40,7 @@ private:
+         uint32_t Status;
+         uint8_t KeyId[17];
+         uint8_t IVLength;
+-        uint8_t IV[24];
++        uint8_t IV[24 + 12]; // Add 12 bytes for encryption_scheme and encryption_pattern
+         uint16_t SubLength;
+         uint8_t Sub[2048];
+         bool InitWithLast15;
+-- 
+2.7.4
+

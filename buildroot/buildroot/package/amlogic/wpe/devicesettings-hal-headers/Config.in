@@ -1,0 +1,5 @@
+menuconfig BR2_PACKAGE_DEVICESETTINGS_HAL_HEADERS
+	bool "devicesettings-hal-headers"
+	help
+	   rdk devicesettings-hal-headers.
+

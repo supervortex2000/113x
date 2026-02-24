@@ -1,0 +1,7 @@
+config BR2_PACKAGE_NETFLIX_TA_BIN
+        bool "netflix_ta"
+        select BR2_PACKAGE_TDK
+        help
+          netflix ta.
+
+          http://openlinux.amlogic.com

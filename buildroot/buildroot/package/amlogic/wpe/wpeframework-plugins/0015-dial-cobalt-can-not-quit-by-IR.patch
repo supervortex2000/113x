@@ -1,0 +1,21 @@
+diff --git a/DIALServer/YouTube.cpp b/DIALServer/YouTube.cpp
+index bfd9f80..647d91f 100644
+--- a/DIALServer/YouTube.cpp
++++ b/DIALServer/YouTube.cpp
+@@ -94,12 +94,16 @@ namespace DIALHandlers {
+         public:
+             bool Connect() override
+             {
++ #if 0
+                 _browser = Plugin::DIALServer::Default::QueryInterface<Exchange::IBrowser>();
+                 if (_browser != nullptr) {
+                     _browser->Register(&_notification);
+                 }
+ 
+                 return _browser != nullptr;
++#else
++                return true;
++#endif
+             }
+             bool IsConnected() override
+             {

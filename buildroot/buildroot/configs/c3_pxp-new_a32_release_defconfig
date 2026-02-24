@@ -1,0 +1,8 @@
+#----------------------------------------------------------#
+#include "arch_a32_10.3.config"
+
+#----------------------------------------------------------#
+#include "c3_pxp.config"
+#include "flash_emmc.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesonc3_pxp_k515/initramfs/ramfslist-32"
+

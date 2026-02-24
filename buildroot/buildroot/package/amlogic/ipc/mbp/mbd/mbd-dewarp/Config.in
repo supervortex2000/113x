@@ -1,0 +1,8 @@
+config BR2_PACKAGE_MBD_DEWARP
+	bool "mbd dewarp"
+	depends on BR2_PACKAGE_LINUX_OSAL
+	depends on BR2_PACKAGE_PMZ
+	depends on BR2_PACKAGE_MBD_BASE
+
+	help
+		ipc mbd dewarp driver

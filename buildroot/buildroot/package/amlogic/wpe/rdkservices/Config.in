@@ -1,0 +1,8 @@
+config BR2_PACKAGE_RDKSERVICES
+	bool "rdkservices"
+	select BR2_PACKAGE_WPEFRAMEWORK
+	select BR2_PACKAGE_DEVICESETTINGS
+	select BR2_PACKAGE_IARMMGRS
+	select BR2_PACKAGE_TROWER_BASE64
+	help
+	   rdk rdkservices

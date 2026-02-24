@@ -1,0 +1,13 @@
+diff --git a/Source/WPEFramework/PluginServer.h b/Source/WPEFramework/PluginServer.h
+index afaaef4..e96da46 100644
+--- a/Source/WPEFramework/PluginServer.h
++++ b/Source/WPEFramework/PluginServer.h
+@@ -1677,7 +1677,7 @@ namespace PluginHost {
+ 
+                     result = service->QueryInterface(id);
+                 }
+-                return (result);
++                return (service);
+             }
+ 
+             void* Instantiate(const RPC::Object& object, const uint32_t waitTime, uint32_t& sessionId, const string& className, const string& callsign, const string& dataPath, const string& persistentPath, const string& volatilePath)

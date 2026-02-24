@@ -1,0 +1,5 @@
+source "package/amlogic/wpe/wpeframework-cdmi/ClearkeyConfig.in"
+source "package/amlogic/wpe/wpeframework-cdmi/PlayreadyConfig.in"
+source "package/amlogic/wpe/wpeframework-cdmi/WidevineConfig.in"
+source "package/amlogic/wpe/wpeframework-cdmi/NagraConfig.in"
+source "package/amlogic/wpe/wpeframework-cdmi/NCASConfig.in"

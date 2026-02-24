@@ -1,0 +1,8 @@
+#----------------------------------------------------------#
+#include "arch_a64_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "t3_ar301.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesont3_ar301/initramfs/ramfslist-64"
+
+BR2_PACKAGE_COBALT=n

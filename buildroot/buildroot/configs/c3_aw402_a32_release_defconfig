@@ -1,0 +1,40 @@
+#----------------------------------------------------------#
+#include "arch_a32_10.3.config"
+
+#----------------------------------------------------------#
+#include "c3_aw401.config"
+#
+#include "arm_rtos_sdk.config"
+
+BR2_LINUX_KERNEL_INTREE_DTS_NAME="c3_c302x_aw402_128m"
+BR2_TARGET_UBOOT_BOARDNAME="c3_aw402"
+BR2_ROOTFS_UPGRADE_DIR="board/amlogic/common/upgrade/upgrade-c3-doorbell"
+BR2_PACKAGE_AML_ARM_RTOS_SDK_BUILD_OPTION="arm64 c3 aw402_c302x fastboot"
+#include "flash_nand_2k.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesonc3_aw402/initramfs/ramfslist-32-ubi-release"
+BR2_LINUX_KERNEL_DEFCONFIG="meson64_a32_C3_mini"
+BR2_PACKAGE_AML_CUSTOMIZE_KERNEL_SET_OPT_LIST="CONFIG_FUSE_FS=n CONFIG_NTFS_FS=n CONFIG_OVERLAY_FS=n"
+BR2_LINUX_KERNEL_MODULES_SEQUENCE_LIST="board/amlogic/mesonc3_aw402/modules_sequence_list"
+BR2_ROOTFS_OVERLAY="board/amlogic/mesonc3_aw402/rootfs/"
+
+BR2_PACKAGE_BUSYBOX_CONFIG="board/amlogic/mesonc3_aw402/busybox.config"
+#w1 & broadcom wifi
+BR2_PACKAGE_DHD_PRIV=y
+BR2_PACKAGE_AML_WIFI=y
+BR2_PACKAGE_AML_BT=y
+BR2_PACKAGE_WIFI_FW_WIFI_MODULE="AP6201BM"
+BR2_PACKAGE_BRCMAP6XXX=y
+BR2_PACKAGE_AML_BRCM_BSA=y
+BR2_SYSTEM_DHCP="wlan0"
+BR2_PACKAGE_BRCMAP6XXX_LOCAL_PATH="$(TOPDIR)/../hardware/aml-5.15/wifi/broadcom/drivers/ap6xxx"
+
+
+#BLUEZ
+BR2_PACKAGE_BLUEZ5_UTILS=y
+BR2_PACKAGE_BLUEZ5_UTILS_OBEX=y
+BR2_PACKAGE_BLUEZ5_UTILS_CLIENT=y
+BR2_PACKAGE_BLUEZ_ALSA=y
+BR2_PACKAGE_ALSA_LIB=y
+BR2_PACKAGE_FDK_AAC=y
+
+BR2_LINUX_KERNEL_GZIP=y

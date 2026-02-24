@@ -1,0 +1,134 @@
+diff -Nur a/configure.ac b/configure.ac
+--- a/configure.ac	2018-07-23 22:02:57.000000000 +0800
++++ b/configure.ac	2021-01-30 10:54:55.385372671 +0800
+@@ -45,6 +45,8 @@
+ # Borrowed from gst-plugins-bad
+ AC_CHECK_HEADER(MobileCoreServices/MobileCoreServices.h, HAVE_IOS="yes", HAVE_IOS="no", [-])
+ 
++AC_CHECK_HEADERS([cxxabi.h execinfo.h])
++
+ # Based on gst-plugins-bad configure.ac and defines in
+ # <chromium source>/build/config/BUILDCONFIG.gn and
+ # webrtc/BUILD.gn
+diff -Nur a/Makefile b/Makefile
+--- a/Makefile	1970-01-01 08:00:00.000000000 +0800
++++ b/Makefile	2021-02-02 16:40:44.304147549 +0800
+@@ -0,0 +1,62 @@
++CFLAGS += -I./
++
++SRCS = ./webrtc/modules/audio_processing/utility/delay_estimator_wrapper.c \
++	./webrtc/common_audio/ring_buffer.c \
++        ./webrtc/common_audio/fft4g.c \
++	./webrtc/modules/audio_processing/utility/delay_estimator.c \
++	./webrtc/common_audio/signal_processing/randomization_functions.c \
++        ./webrtc/common_audio/signal_processing/division_operations.c \
++        ./webrtc/common_audio/signal_processing/copy_set_operations.c \
++        ./webrtc/modules/audio_processing/agc/legacy/analog_agc.c \
++        ./webrtc/modules/audio_processing/agc/legacy/digital_agc.c \
++        ./webrtc/common_audio/signal_processing/dot_product_with_scale.c \
++        ./webrtc/common_audio/signal_processing/resample_by_2.c \
++        ./webrtc/common_audio/signal_processing/spl_sqrt.c \
++        ./webrtc/modules/audio_processing/ns/ns_core.c \
++        ./webrtc/modules/audio_processing/ns/noise_suppression.c \
++        ./webrtc/modules/audio_processing/aec/aec_core.c \
++	./webrtc/modules/audio_processing/aec/echo_cancellation.c \
++	./webrtc/modules/audio_processing/aec/aec_resampler.c \
++	./webrtc/modules/audio_processing/aec/aec_rdft.c \
++	./webrtc/modules/audio_processing/aec/aec_core_neon.c \
++	./webrtc/modules/audio_processing/aec/aec_rdft_neon.c
++
++TARGET = libwebrtc_apm.so
++
++CFLAGS += -Wall -Werror -Werror=jump-misses-init -fPIC -g -O2
++CFLAGS += -DWEBRTC_AUDIO_PROCESSING_ONLY_BUILD -DWEBRTC_POSIX -DWEBRTC_LINUX -DWEBRTC_THREAD_RR  -DWEBRTC_HAS_NEON 
++
++LDFLAGS += -shared 
++
++OBJDIR = objs
++
++OBJS = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))
++
++SUFFIXES += .d
++DEPFILES := $(patsubst %c,$(OBJDIR)/%d,$(SRCS))
++NODEPS := clean distclean
++
++all: $(TARGET)
++
++ifeq "$(findstring $(MAKECMDGOALS),$(NODEPS))"  ""
++  -include $(DEPFILES)
++endif
++
++$(TARGET): $(OBJS)
++	@echo " [LINK] $@"
++	$(CC) -o $@ $(LDFLAGS) $+
++
++$(OBJDIR)/%.o: %.c $(OBJDIR)/%.d
++	@echo " [CC] $<"
++	@$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ -c $<
++
++$(OBJDIR)/%.d: %.c
++	@echo " [DEP] $<"
++	@mkdir -p $(OBJDIR)/$(dir $<)
++	@$(CC) $(CPPFLAGS) $(CFLAGS) -M -MT "$(patsubst %.c,$(OBJDIR)/%.o,$<)" $< -MF $@
++
++.PHONY:clean
++
++clean:
++	@echo " [CLEAN] ..."
++	@rm -rf $(OBJDIR) $(TARGET)
+diff -Nur a/webrtc/base/checks.cc b/webrtc/base/checks.cc
+--- a/webrtc/base/checks.cc	2018-07-23 22:02:57.000000000 +0800
++++ b/webrtc/base/checks.cc	2021-01-30 10:55:38.240531921 +0800
+@@ -16,7 +16,7 @@
+ #include <cstdio>
+ #include <cstdlib>
+ 
+-#if defined(__GLIBCXX__) && !defined(__UCLIBC__)
++#if defined(HAVE_CXX_ABI_H) && defined(HAVE_EXECINFO_H)
+ #include <cxxabi.h>
+ #include <execinfo.h>
+ #endif
+@@ -55,7 +55,7 @@
+ // to get usable symbols on Linux. This is copied from V8. Chromium has a more
+ // advanced stace trace system; also more difficult to copy.
+ void DumpBacktrace() {
+-#if defined(__GLIBCXX__) && !defined(__UCLIBC__)
++#if defined(HAVE_CXX_ABI_H) && defined(HAVE_EXECINFO_H)
+   void* trace[100];
+   int size = backtrace(trace, sizeof(trace) / sizeof(*trace));
+   char** symbols = backtrace_symbols(trace, size);
+diff -Nur a/webrtc/modules/audio_processing/aec/aec_core_internal.h b/webrtc/modules/audio_processing/aec/aec_core_internal.h
+--- a/webrtc/modules/audio_processing/aec/aec_core_internal.h	2018-07-23 22:02:57.000000000 +0800
++++ b/webrtc/modules/audio_processing/aec/aec_core_internal.h	2021-01-30 10:55:47.121285655 +0800
+@@ -22,7 +22,7 @@
+ enum {
+   kExtendedNumPartitions = 32
+ };
+-static const int kNormalNumPartitions = 12;
++static const int kNormalNumPartitions = 3;
+ 
+ // Delay estimator constants, used for logging and delay compensation if
+ // if reported delays are disabled.
+diff -Nur a/webrtc/modules/audio_processing/aec/echo_cancellation.c b/webrtc/modules/audio_processing/aec/echo_cancellation.c
+--- a/webrtc/modules/audio_processing/aec/echo_cancellation.c	2018-07-23 22:02:57.000000000 +0800
++++ b/webrtc/modules/audio_processing/aec/echo_cancellation.c	2021-01-30 10:55:55.376566011 +0800
+@@ -607,7 +607,7 @@
+   msInSndCardBuf =
+       msInSndCardBuf > kMaxTrustedDelayMs ? kMaxTrustedDelayMs : msInSndCardBuf;
+   // TODO(andrew): we need to investigate if this +10 is really wanted.
+-  msInSndCardBuf += 10;
++  //msInSndCardBuf += 10;
+   aecpc->msInSndCardBuf = msInSndCardBuf;
+ 
+   if (aecpc->skewMode == kAecTrue) {
+diff -Nur a/webrtc/typedefs.h b/webrtc/typedefs.h
+--- a/webrtc/typedefs.h	2018-07-23 22:02:57.000000000 +0800
++++ b/webrtc/typedefs.h	2021-02-02 16:18:00.070341160 +0800
+@@ -26,6 +26,7 @@
+ #elif defined(__aarch64__)
+ #define WEBRTC_ARCH_64_BITS
+ #define WEBRTC_ARCH_LITTLE_ENDIAN
++#define WEBRTC_ARCH_ARM64
+ #elif defined(_M_IX86) || defined(__i386__)
+ #define WEBRTC_ARCH_X86_FAMILY
+ #define WEBRTC_ARCH_X86

@@ -1,0 +1,17 @@
+config BR2_PACKAGE_LIBPLAYER
+        bool "libplayer"
+        select BR2_PACKAGE_ALSA_LIB
+        select BR2_PACKAGE_ZLIB
+        select BR2_PACKAGE_LIBCURL
+        select BR2_PACKAGE_DTV_AUDIO_UTILS
+        help
+          amlogic media player library.
+
+          http://openlinux.amlogic.com
+
+config BR2_PACKAGE_LIBPLAYER_BASE_LIBS
+	bool "libplayer_player"
+	default n
+	depends on BR2_PACKAGE_LIBPLAYER
+	help
+	  only enable libplayer building for base libs

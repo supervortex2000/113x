@@ -1,0 +1,513 @@
+#!/bin/sh
+
+url_ytcert_main="https://ytlr-cert.appspot.com/2021/main.html"
+url_ytcert_main2022="https://ytlr-cert.appspot.com/2022/main.html"
+user_agent="https://www.youtube.com/tv?env_isPartner=true&use_toa=true"
+youtube_tv="https://www.youtube.com/tv"
+url_console="https://www.youtube.com/tv?enableEventConsole=true&env_showConsole=true"
+url_60FPS="https://www.youtube.com/tv?v=aqz-KE-bpKQ"
+url_ytcert_manual="https://ytlr-cert.appspot.com/2021/main.html?&test_type=manual-test"
+url_evergreep="https://ytlr-cert.appspot.com/2021/manual/evergreen-cert-test.html"
+url_eg_mapp="https://ytlr-cert.appspot.com/2021/manual/multi-app-test.html"
+url_certp10="https://www.youtube.com/tv?automationRoutine=certPerformanceRoutine&samples=10&use_toa=true&hl=enUS&gl=en_US"
+url_certp="https://www.youtube.com/tv?automationRoutine=certPerformanceRoutine&samples=300&use_toa=true&hl=enUS&gl=en_US"
+
+help() {
+  echo "Usage: $(basename $0) [ocdm | yt | yts | st] [start | stop | focus | front | back]"
+  echo "       [key] [left | right | up | down | enter | home]"
+  echo "Example:"
+  echo "    launch youtube, run command: wpe yt start"
+  echo "    stop youtube, run command: wpe yt stop"
+  echo "    set youtube focus, run command: wpe yt focus"
+  echo "    youtube on front, run command: wpe yt front"
+  echo "    youtube on back, run command: wpe yt back"
+  echo "    send left key, run command: wpe key left"
+}
+
+key_action()
+{
+  curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc":"2.0", "id":3, "method":"org.rdk.RDKShell.1.generateKey", "params":{"keys":[ {"keyCode": '$keycode',"modifiers": [],"delay":0.0},]}}';echo
+}
+
+vol_process()
+{
+  if [ -n $1 ] ; then
+    echo "Set volume to  $1"
+    amixer cset numid=1 $1
+  else
+    echo "Get volume "
+    amixer cget numid=1
+  fi
+
+}
+
+
+key_process()
+{
+  echo "key_process $1"
+
+  case $1 in
+    left)
+      keycode=105
+      key_action
+      ;;
+    right)
+      keycode=106
+      key_action
+      ;;
+    up)
+      keycode=103
+      key_action
+      ;;
+    down)
+      keycode=108
+      key_action
+      ;;
+    enter)
+      keycode=28
+      key_action
+      ;;
+    home)
+      keycode=1
+      key_action
+      ;;
+		next)
+      keycode=163
+      key_action
+      ;;
+		prev)
+      keycode=165
+      key_action
+      ;;
+
+    *)
+      echo "Usage: $(basename $0) [key] [left | right | up | down | enter | home]"
+      ;;
+  esac
+}
+
+url_delay=2
+url_process()
+{
+	case $1 in
+		1)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=RF61SsY83zQ&t=13s"}'
+			sleep $url_delay
+			key_process enter
+
+			;;
+		2)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=Y1ucj1pXUQI"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		3)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=w68asYD6Zqg"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		4)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=bSWLj2HZT-Q"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		5)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=dyiA_uhB1lU"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		6)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=MFqFdKVaKDM"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		7)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=SFXmJENIX_E"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		8)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=GLH-iH4nd6E"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		9)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=hZRyp3Rh4ro"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		10)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=5qBjFZV19p0"}'
+			sleep $url_delay
+			key_process enter
+			;;	
+		11)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=pdVl3WvgJ50"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		12)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=bzoMyATvhdw"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		13)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=r8mdNahdo4M"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		14)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=4sPj8HhbwHs"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		15)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=Kp6_sDiup6U"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		16)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=OtuFaEy4jzE"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		17)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=MmNUi0itl-8"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		18)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=PIuFayQ2zUg"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		19)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=QX3M8Ka9vUA"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		20)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=ca-C3voZwpM"}'
+			sleep $url_delay
+			key_process enter
+			;;
+    21)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=kbtZaqWVUgA"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		22)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=WyMTSvVAtWM"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		23)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=74YQWthFz8g"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		24)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=sAgHorbxqsU"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		25)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=Ky1YTEDYkCw"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		26)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=XOkfOLbSE6o"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		27)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=s0rBTPcnWLk"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		28)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=blTglME9rvQ"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		29)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=OoABbB7KhUM"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		30)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=QkPBam3qO34"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		31)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=Ky1YTEDYkCw"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		1080p)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=1wGrsf__sFs"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		avc1live)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=w_Ma8oQLmSM"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		12hour)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/tv?automationRoutine=watchEnduranceRoutine&list=PLT2JIu9jdshr-q6fs7BCqAygvTHwnZUIt&use_toa=1"}'
+			sleep 3
+			key_process enter
+			;;
+		vp9sec1)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=p3A0z12RdXA"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		dualvideo)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://ytlr-cert.appspot.com/2021/manual/dual_video.html"}'
+			sleep $url_delay
+			key_process enter
+			;;	
+		4k)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=NPGbUjSguMk"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		thailand)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=SYCWtytwWI0"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		china)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=XnAqOqGPIXI"}'
+			sleep $url_delay
+			key_process enter
+			;;
+    newyork)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=-IpXdtWfneI"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		corn)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/watch?v=ttuc8s6y6u4"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		livedrm)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/tv?list=PLT2JIu9jdshrFoCo9B81bRwsToEazVdpj"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		auth)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/tv?show_signature_verification_watermark=true"}'
+			sleep $url_delay
+			key_process enter
+			;;
+		certp)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/tv?automationRoutine=certPerformanceRoutine&samples=300&use_toa=true&hl=enUS&gl=en_US"}'
+			sleep $url_delay
+			#key_process enter
+			;;
+		certp10)
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":"https://www.youtube.com/tv?automationRoutine=certPerformanceRoutine&samples=10&use_toa=true&hl=enUS&gl=en_US"}'
+			sleep $url_delay
+			#key_process enter
+			;;
+		*)
+			echo "no this test cases"
+			curl "http://localhost:80/Service/Cobalt/URL" -d '{"url":'$1'}'
+			sleep $url_delay
+			key_process enter
+			;;
+	esac
+
+}
+
+app_process()
+{
+  echo "app_process $1 $APP_NAME"
+
+  case $1 in
+    start)
+			if [ -n "$2" ] ; then
+				curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "Controller.1.configurl@Cobalt", "params": { "launchtype": '$2' }}' ; echo
+
+			fi
+      curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "Controller.1.activate", "params": { "callsign": '$APP_NAME' }}' ; echo
+			#ytcert_func "$youtube_tv"
+      ;;
+    stop)
+      curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "Controller.1.deactivate", "params": { "callsign": '$APP_NAME' }}' ; echo
+      ;;
+    focus)
+      curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "org.rdk.RDKShell.1.setFocus", "params": { "client": '$APP_NAME' }}' ; echo
+      ;;
+    front)
+      curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "org.rdk.RDKShell.1.moveToFront", "params": { "client": '$APP_NAME' }}' ; echo
+      ;;
+    back)
+      curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "org.rdk.RDKShell.1.moveToBack", "params": { "client": '$APP_NAME' }}' ; echo
+      ;;
+    hide)
+      curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "org.rdk.RDKShell.1.setVisibility", "params": { "client": '$APP_NAME', "visible": false }}' ; echo
+      ;;
+    show)
+      curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "org.rdk.RDKShell.1.setVisibility", "params": { "client": '$APP_NAME', "visible": true }}' ; echo
+      ;;
+		url)
+			#curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "Controller.1.configuration@Cobalt", "params": {"url":'$2', "clientidentifier":"wst-cobalt", "root":{ "outofprocess":true}}}' ; echo
+			echo "url = $2"
+			curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "Controller.1.configurl@'$APP_NAME'", "params": { "url": '$2' }}' ; echo
+			curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "Controller.1.activate", "params": { "callsign": '$APP_NAME'}}' ; echo	
+			;;
+		configline)
+      curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "Controller.1.configuration"}' ; echo
+      ;;
+		config)
+      curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "Controller.1.configuration@'$APP_NAME'"}' ; echo
+			;;
+		status)
+      curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "Controller.1.status@'$APP_NAME'"}' ; echo
+      curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "org.rdk.RDKShell.1.getVisibility", "params": { "client": '$APP_NAME' }}' ; echo
+			;;
+    *)
+      echo "Usage: $(basename $0) [ocdm | yt | yts | st] [start | stop | focus | front | back]"
+      ;;
+  esac
+}
+
+
+ytcert_func()
+{
+	# $1 URL
+	curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "Controller.1.configurl@Cobalt", "params": { "url": '$1' }}' ; echo
+  curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "Controller.1.activate", "params": { "callsign": "Cobalt" }}' ; echo
+}
+ytcert_process()
+{
+  echo "ytcert_process $1"
+
+  case $1 in
+    start)
+			# change Cobalt's url to youtube cert address	
+			#curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "Controller.1.configurl@'$APP_NAME'", "params": { "url": '$url_ytcert_main' }}' ; echo
+      #curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "Controller.1.activate", "params": { "callsign": '$APP_NAME' }}' ; echo
+			ytcert_func "$url_ytcert_main"
+      ;;
+		2022)
+			ytcert_func "$url_ytcert_main2022"
+			;;
+		user-agent)
+			# change Cobalt's url to youtube cert address	
+			ytcert_func "$user_agent"
+      ;;
+		stop)
+			curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "Controller.1.deactivate", "params": { "callsign": '$APP_NAME' }}' ; echo
+			;;
+    dial)
+			curl -X POST -H "Origin: https://www.youtube.com;Content-Type: text/plain;charset=UTF-8" "http://127.0.0.1:80/Service/DIALServer/Apps/YouTube" -d "v=dMH0bHeiRNg"
+      ;;
+		manual)
+			ytcert_func $url_ytcert_manual
+			;;
+		console)
+			ytcert_func $url_console
+			;;
+		60fps)
+			ytcert_func $url_60FPS
+			;;
+		evergreen)
+			ytcert_func $url_evergreep
+			;;
+		mapp)
+			ytcert_func $url_eg_mapp
+			;;
+		certp)
+			ytcert_func $url_certp
+			;;
+		certp10)
+			ytcert_func $url_certp10
+			;;
+    *)
+      echo "Usage: $(basename $0) [ocdm | yt | st] [start | stop | focus | front | back]"
+			echo "Usage: $(basename $0) [yts] [start | manual | dial ]"
+      ;;
+  esac
+}
+
+
+case $1 in
+  key)
+    shift
+    key_process "$@"
+    ;;
+  vol)
+    shift
+    vol_process "$@"
+    ;;
+  ocdm)
+    APP_NAME=OCDM
+    shift
+    app_process "$@"
+    ;;
+  yt)
+    APP_NAME=Cobalt
+    shift
+    app_process "$@"
+    ;;
+	url)
+    shift
+    url_process "$@"
+    ;;
+  yts)
+    APP_NAME=Cobalt
+    shift
+    ytcert_process "$@"
+    ;;
+  st)
+    APP_NAME=StressTest
+    shift
+    app_process "$@"
+    ;;
+	dial)
+		curl -X POST -H "Origin: https://www.youtube.com;Content-Type: text/plain;charset=UTF-8" "http://127.0.0.1:80/Service/DIALServer/Apps/YouTube" -d "v=dMH0bHeiRNg"
+		;;
+	cdisp)
+		if [ -n "$2" ] ; then
+			curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "org.rdk.RDKShell.1.createDisplay", "params": { "client": '$2', "displayName": '$2' }}' ; echo
+		else
+			echo "Please input display name first"
+		fi
+
+		;;
+	ddisp)
+		if [ -n "$2" ] ; then
+			curl 'http://127.0.0.1:80/jsonrpc' -d '{"jsonrpc": "2.0","id": 4,"method": "org.rdk.RDKShell.1.destroyDisplay", "params": { "client": '$2', "displayName": '$2' }}' ; echo
+		else
+			echo "Please input display name first"
+			echo "wpe ddisp [display_name]"
+		fi
+
+		;;
+	egnplb)
+		elf_loader_sandbox --evergreen_library=app/cobalt/lib/libnplb.so --evergreen_content=app/cobalt/content 2>&1 | tee /data/nplb.log
+		;;
+  *)
+    if [ -n $1 ] ; then
+      if [ -f "/etc/WPEFramework/plugins/$1.json" ] ; then
+        APP_NAME=$1
+        shift
+        app_process "$@"
+      else
+        echo "Unknow command $1"
+        help
+      fi
+    else
+
+      help
+    fi
+    ;;
+esac

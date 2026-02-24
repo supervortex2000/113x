@@ -1,0 +1,8 @@
+#----------------------------------------------------------#
+#include "arch_a6432_6.3.1.config"
+
+#----------------------------------------------------------#
+#include "t7_an400.config"
+BR2_TARGET_ROOTFS_INITRAMFS_LIST="board/amlogic/mesont7_an400/initramfs/ramfslist-32"
+
+BR2_PACKAGE_COBALT=n

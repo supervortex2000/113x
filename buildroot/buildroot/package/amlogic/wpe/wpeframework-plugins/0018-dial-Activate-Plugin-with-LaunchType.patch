@@ -1,0 +1,32 @@
+From ea9fc481c9c265b10b5627ba8290d5c3fdfc7986 Mon Sep 17 00:00:00 2001
+From: Yeping Miao <yeping.miao@amlogic.com>
+Date: Wed, 23 Jun 2021 15:31:44 +0800
+Subject: [PATCH] dial Activate Plugin with LaunchType
+
+Change-Id: I3bcfd12aa08bdad178d415cb68b19c0dde61e3fa
+---
+ DIALServer/DIALServer.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/DIALServer/DIALServer.h b/DIALServer/DIALServer.h
+index a8829385..aac1967e 100644
+--- a/DIALServer/DIALServer.h
++++ b/DIALServer/DIALServer.h
+@@ -323,6 +323,14 @@ namespace Plugin {
+                     if (_switchBoard != nullptr) {
+                         result = _switchBoard->Activate(_callsign);
+                     } else {
++                      if (_service->Callsign() == string("Cobalt")) {
++                        // Change Youtube launch type
++                        syslog(LOG_ERR, "Change youtube launch type\n");
++                        static auto controllerClient = new WPEFramework::JSONRPC::LinkType<WPEFramework::Core::JSON::IElement>("Controller.1");
++                        JsonObject launchtype = JsonObject("{\"launchtype\": \"dial\"}");
++                        if (controllerClient)
++                          uint32_t result = controllerClient->Set<JsonObject>(1000, "configurl@Cobalt", launchtype);
++                        }
+                         result = _service->Activate(PluginHost::IShell::REQUESTED);
+                     }
+ 
+-- 
+2.31.0
+

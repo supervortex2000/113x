@@ -1,0 +1,39 @@
+From 07e548020dc1d1b5e70c70c9750dbc1ba83b4489 Mon Sep 17 00:00:00 2001
+From: Song Zhao <song.zhao@amlogic.com>
+Date: Fri, 26 Mar 2021 08:38:35 -0700
+Subject: [PATCH 14/14] westeros-sink: fix a crash inside wstGetInputBuffer()
+
+Add lock to avoid race condition
+---
+ westeros-sink/v4l2/westeros-sink-soc.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/westeros-sink/v4l2/westeros-sink-soc.c b/westeros-sink/v4l2/westeros-sink-soc.c
+index 1b8fff1..416811b 100644
+--- a/westeros-sink/v4l2/westeros-sink-soc.c
++++ b/westeros-sink/v4l2/westeros-sink-soc.c
+@@ -3136,6 +3136,13 @@ static int wstGetInputBuffer( GstWesterosSink *sink )
+ {
+    int bufferIndex= -1;
+    int i;
++
++   LOCK(sink);
++   if (!sink->soc.inBuffers)
++   {
++      UNLOCK(sink);
++      return bufferIndex;
++   }
+    for( i= 0; i < sink->soc.numBuffersIn; ++i )
+    {
+       if ( !sink->soc.inBuffers[i].queued )
+@@ -3144,6 +3151,7 @@ static int wstGetInputBuffer( GstWesterosSink *sink )
+          break;
+       }
+    }
++   UNLOCK(sink);
+ 
+    if ( bufferIndex < 0 )
+    {
+-- 
+2.31.0
+

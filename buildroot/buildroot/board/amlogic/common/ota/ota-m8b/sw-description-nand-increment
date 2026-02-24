@@ -1,0 +1,34 @@
+software =
+{
+	version = "1.0.1";
+	hardware-compatibility: [ "1.0" ];
+	files: (
+		{
+			filename = "rootfs.tgz";
+			path = "/tmp/rootfs.tgz";
+		}
+	);
+	scripts: (
+		{
+			filename = "update.sh";
+			type = "shellscript";
+		}
+	);
+	images: (
+		{
+			filename = "boot.img";
+			device = "/dev/mtd3";
+			type = "flash";
+		},
+        {
+			filename = "u-boot.bin";
+			device = "/dev/bootloader";
+        }
+	);
+	uboot: (
+		{
+			name = "upgrade_step";
+			value = "1";
+		}
+	);
+}
